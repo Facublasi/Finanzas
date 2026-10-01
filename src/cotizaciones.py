@@ -4,6 +4,8 @@ from datetime import date, datetime, timedelta
 
 import yfinance as yf
 
+from metricas import resumen, retornos_log
+
 FRECUENCIAS = {
     "1": ("1d", "Diaria"),
     "2": ("1wk", "Semanal"),
@@ -62,8 +64,19 @@ def main():
     if datos.empty:
         print(f"\nNo se encontraron datos para {ticker} en ese rango.")
         return
+    datos["Ret. log"] = retornos_log(datos["Close"])
     print(f"\n{ticker} | {inicio} a {fin} | intervalo {intervalo}\n")
-    print(datos[["Open", "High", "Low", "Close", "Volume"]])
+    print(datos[["Open", "High", "Low", "Close", "Volume", "Ret. log"]])
+
+    if len(datos) < 3:
+        print("\nHacen falta al menos 3 precios para calcular la volatilidad.")
+        return
+    r = resumen(datos["Close"], intervalo)
+    print(f"\nResumen ({r['observaciones']} retornos)")
+    print(f"  Retorno logarítmico total:  {r['retorno_log_total']:8.2%}")
+    print(f"  Retorno logarítmico medio:  {r['retorno_log_medio']:8.4%} por período")
+    print(f"  Volatilidad:                {r['volatilidad_periodo']:8.4%} por período")
+    print(f"  Volatilidad anualizada:     {r['volatilidad_anual']:8.2%}")
 
 
 if __name__ == "__main__":

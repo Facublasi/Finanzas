@@ -28,3 +28,14 @@ Elegí una opción [1]: 2
 ```
 
 Muestra apertura, máximo, mínimo, cierre y volumen. Las fechas de inicio y fin están incluidas.
+
+## Retornos y volatilidad
+
+Además de los precios, el programa calcula con los precios de cierre (`src/metricas.py`):
+
+- **Retorno logarítmico** de cada período: `ln(P_t / P_t-1)` (columna `Ret. log`).
+- **Retorno logarítmico total**: suma de los retornos del período, igual a `ln(P_fin / P_inicio)`.
+- **Volatilidad**: desvío estándar muestral de los retornos logarítmicos.
+- **Volatilidad anualizada**: volatilidad × √(períodos por año), con 252 días hábiles, 52 semanas o 12 meses según la frecuencia elegida.
+
+Los precios que devuelve yfinance están ajustados por dividendos y splits.

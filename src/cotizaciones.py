@@ -6,6 +6,10 @@ import yfinance as yf
 
 from metricas import resumen, retornos_log
 
+# Rendimiento anual (en %) de la Letra del Tesoro de EE.UU. a 13 semanas.
+TICKER_TASA_USD = "^IRX"
+TASA_POR_DEFECTO = 5.0
+
 FRECUENCIAS = {
     "1": ("1d", "Diaria"),
     "2": ("1wk", "Semanal"),
@@ -57,11 +61,38 @@ def pedir_tasa(mensaje: str, defecto: float) -> float:
 
 
 def descargar(ticker: str, inicio: date, fin: date, intervalo: str):
-    """Devuelve precios de `ticker` entre `inicio` y `fin` (ambos incluidos)."""
+    """Devuelve los precios de `ticker` entre `inicio` y `fin` (ambos incluidos)
+    y la moneda en la que cotiza (por ejemplo "USD" o "ARS")."""
+    activo = yf.Ticker(ticker)
     # yfinance no incluye la fecha de fin, por eso se le suma un día.
-    return yf.Ticker(ticker).history(
-        start=inicio, end=fin + timedelta(days=1), interval=intervalo
-    )
+    datos = activo.history(start=inicio, end=fin + timedelta(days=1), interval=intervalo)
+    moneda = activo.history_metadata.get("currency") if not datos.empty else None
+    return datos, moneda
+
+
+def tasa_promedio_usd(inicio: date, fin: date):
+    """Promedio del rendimiento de ^IRX entre `inicio` y `fin`, en %.
+
+    Devuelve None si no hay datos para ese rango.
+    """
+    datos, _ = descargar(TICKER_TASA_USD, inicio, fin, "1d")
+    if datos.empty:
+        return None
+    return float(datos["Close"].mean())
+
+
+def tasa_sugerida(moneda: str, inicio: date, fin: date) -> float:
+    """Tasa libre de riesgo (en %) para ofrecer como valor por defecto."""
+    if moneda != "USD":
+        print(f"\nEl activo cotiza en {moneda}: ingresá una tasa libre de riesgo en esa moneda.")
+        return TASA_POR_DEFECTO
+    tasa = tasa_promedio_usd(inicio, fin)
+    if tasa is None:
+        print(f"\nNo hay datos de {TICKER_TASA_USD} para ese rango; se sugiere {TASA_POR_DEFECTO:g}%.")
+        return TASA_POR_DEFECTO
+    print(f"\nPromedio de {TICKER_TASA_USD} (Letra del Tesoro de EE.UU. a 13 semanas)"
+          f" entre {inicio} y {fin}: {tasa:.2f}%")
+    return round(tasa, 2)
 
 
 def main():
@@ -74,14 +105,15 @@ def main():
             break
         print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
     intervalo = pedir_frecuencia()
-    tasa_libre_riesgo = pedir_tasa(
-        "Tasa libre de riesgo anual en % (en la moneda del activo)", 5.0
-    )
 
-    datos = descargar(ticker, inicio, fin, intervalo)
+    datos, moneda = descargar(ticker, inicio, fin, intervalo)
     if datos.empty:
         print(f"\nNo se encontraron datos para {ticker} en ese rango.")
         return
+    tasa_libre_riesgo = pedir_tasa(
+        f"Tasa libre de riesgo anual en % ({moneda})",
+        tasa_sugerida(moneda, inicio, fin),
+    )
     datos["Ret. log"] = retornos_log(datos["Close"])
     print(f"\n{ticker} | {inicio} a {fin} | intervalo {intervalo}\n")
     print(datos[["Open", "High", "Low", "Close", "Volume", "Ret. log"]])

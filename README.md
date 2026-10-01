@@ -17,7 +17,7 @@ python src/cotizaciones.py
 El programa pide los datos por teclado. Si apretás Enter sin escribir nada, usa el valor entre corchetes.
 
 ```
-Ticker (tiene que cotizar en USD) [GGAL]: AAPL
+Tickers separados por coma (tienen que cotizar en USD) [GGAL]: AAPL, YPF, KO
 Fecha de inicio (AAAA-MM-DD) [2026-09-01]: 2026-01-01
 Fecha de fin (AAAA-MM-DD) [2026-10-01]: 2026-06-30
 Frecuencia:
@@ -30,7 +30,19 @@ Tasa libre de riesgo: promedio de ^IRX (Letra del Tesoro de EE.UU. a 13 semanas)
 Tasa libre de riesgo anual en % [3.6]:
 ```
 
-Muestra apertura, máximo, mínimo, cierre y volumen. Las fechas de inicio y fin están incluidas.
+Se pueden ingresar uno o varios tickers, separados por coma o espacio. Las fechas de inicio y fin están incluidas.
+
+- **Un ticker**: muestra la tabla de precios (apertura, máximo, mínimo, cierre, volumen y retorno logarítmico) y el resumen de métricas.
+- **Varios tickers**: muestra una tabla comparativa con una fila por activo, ordenada de mayor a menor Sharpe:
+
+```
+      Retornos Ret. log total Ret. log anual Volatilidad anual Sharpe
+KO         187         23.89%         32.19%            19.43%   1.47
+YPF        187         30.58%         41.21%            38.91%   0.97
+AAPL       187         20.06%         27.04%            26.86%   0.87
+```
+
+Los tickers sin datos, que no cotizan en USD o con menos de 3 precios se omiten con un aviso y se sigue con el resto.
 
 Solo se analizan activos que cotizan en **USD** (por ejemplo `AAPL` o `GGAL`, el ADR en NYSE). Si el ticker cotiza en otra moneda (como `GGAL.BA`, en pesos), el programa avisa y termina.
 

@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, timedelta
 
+import pandas as pd
 import yfinance as yf
 
 from metricas import resumen, retornos_log
@@ -100,45 +101,41 @@ def tasa_promedio(inicio: date, fin: date):
     return round(float(datos["Close"].mean()), 2)
 
 
-def main():
-    hoy = date.today()
+def pedir_tickers() -> list:
+    """Pide uno o varios tickers separados por coma o espacio."""
     while True:
-        ticker = pedir_texto("Ticker (tiene que cotizar en USD)", "GGAL").upper()
-        if ticker not in ADRS:
-            break
-        print(f"  {ticker} cotiza en pesos. Para acciones argentinas usá el ADR: {ADRS[ticker]}")
-    while True:
-        inicio = pedir_fecha("Fecha de inicio (AAAA-MM-DD)", hoy - timedelta(days=30))
-        fin = pedir_fecha("Fecha de fin (AAAA-MM-DD)", hoy)
-        if inicio <= fin:
-            break
-        print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
-    intervalo = pedir_frecuencia()
+        valor = pedir_texto("Tickers separados por coma (tienen que cotizar en USD)", "GGAL")
+        tickers = list(dict.fromkeys(valor.upper().replace(",", " ").split()))
+        locales = [t for t in tickers if t in ADRS]
+        if not locales:
+            return tickers
+        for t in locales:
+            print(f"  {t} cotiza en pesos. Para acciones argentinas usá el ADR: {ADRS[t]}")
 
-    datos, moneda = descargar(ticker, inicio, fin, intervalo)
-    if datos.empty:
-        print(f"\nNo se encontraron datos para {ticker} en ese rango.")
-        return
-    if moneda != MONEDA:
-        print(f"\n{ticker} cotiza en {moneda}. Solo se analizan activos en {MONEDA}"
-              " (para acciones argentinas, usá el ADR).")
-        return
-    tasa = tasa_promedio(inicio, fin)
-    if tasa is None:
-        print(f"\nNo hay datos de {TICKER_TASA} entre {inicio} y {fin}.")
-        return
-    print(f"\nTasa libre de riesgo: promedio de {TICKER_TASA} (Letra del Tesoro de"
-          f" EE.UU. a 13 semanas) entre {inicio} y {fin}: {tasa:.2f}%")
-    tasa_libre_riesgo = pedir_tasa("Tasa libre de riesgo anual en %", tasa)
+
+def descargar_validos(tickers: list, inicio: date, fin: date, intervalo: str) -> dict:
+    """Descarga cada ticker y descarta los que no sirven para el análisis."""
+    validos = {}
+    for ticker in tickers:
+        datos, moneda = descargar(ticker, inicio, fin, intervalo)
+        if datos.empty:
+            print(f"  {ticker}: no se encontraron datos en ese rango, se omite.")
+        elif moneda != MONEDA:
+            print(f"  {ticker}: cotiza en {moneda}, se omite (solo se analizan activos"
+                  f" en {MONEDA}; para acciones argentinas, usá el ADR).")
+        elif len(datos) < 3:
+            print(f"  {ticker}: hacen falta al menos 3 precios para calcular la"
+                  " volatilidad, se omite.")
+        else:
+            validos[ticker] = datos
+    return validos
+
+
+def mostrar_detalle(ticker: str, datos, r: dict, tasa_libre_riesgo: float):
+    """Tabla de precios y resumen de métricas de un único activo."""
     datos["Ret. log"] = retornos_log(datos["Close"])
-    print(f"\n{ticker} | {inicio} a {fin} | intervalo {intervalo}\n")
     print(datos[["Open", "High", "Low", "Close", "Volume", "Ret. log"]])
-
-    if len(datos) < 3:
-        print("\nHacen falta al menos 3 precios para calcular la volatilidad.")
-        return
-    r = resumen(datos["Close"], intervalo, tasa_libre_riesgo)
-    print(f"\nResumen ({r['observaciones']} retornos)")
+    print(f"\nResumen de {ticker} ({r['observaciones']} retornos)")
     print(f"  Retorno logarítmico total:  {r['retorno_log_total']:8.2%}")
     print(f"  Retorno logarítmico medio:  {r['retorno_log_medio']:8.4%} por período")
     print(f"  Retorno logarítmico anual:  {r['retorno_log_anual']:8.2%}")
@@ -149,6 +146,63 @@ def main():
         f" (log: {r['tasa_libre_riesgo_log']:.2%})"
     )
     print(f"  Sharpe ratio:               {r['sharpe']:8.2f}")
+
+
+def mostrar_comparativa(resumenes: dict, tasa_libre_riesgo: float):
+    """Tabla con una fila por activo, ordenada de mayor a menor Sharpe."""
+    tabla = pd.DataFrame(
+        {
+            "Retornos": {t: r["observaciones"] for t, r in resumenes.items()},
+            "Ret. log total": {t: r["retorno_log_total"] for t, r in resumenes.items()},
+            "Ret. log anual": {t: r["retorno_log_anual"] for t, r in resumenes.items()},
+            "Volatilidad anual": {t: r["volatilidad_anual"] for t, r in resumenes.items()},
+            "Sharpe": {t: r["sharpe"] for t, r in resumenes.items()},
+        }
+    ).sort_values("Sharpe", ascending=False)
+    porcentaje = "{:.2%}".format
+    print(tabla.to_string(formatters={
+        "Ret. log total": porcentaje,
+        "Ret. log anual": porcentaje,
+        "Volatilidad anual": porcentaje,
+        "Sharpe": "{:.2f}".format,
+    }))
+    print(f"\nTasa libre de riesgo: {tasa_libre_riesgo:.2%}")
+
+
+def main():
+    hoy = date.today()
+    tickers = pedir_tickers()
+    while True:
+        inicio = pedir_fecha("Fecha de inicio (AAAA-MM-DD)", hoy - timedelta(days=30))
+        fin = pedir_fecha("Fecha de fin (AAAA-MM-DD)", hoy)
+        if inicio <= fin:
+            break
+        print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
+    intervalo = pedir_frecuencia()
+
+    print()
+    validos = descargar_validos(tickers, inicio, fin, intervalo)
+    if not validos:
+        print("\nNo quedó ningún activo para analizar.")
+        return
+    tasa = tasa_promedio(inicio, fin)
+    if tasa is None:
+        print(f"\nNo hay datos de {TICKER_TASA} entre {inicio} y {fin}.")
+        return
+    print(f"\nTasa libre de riesgo: promedio de {TICKER_TASA} (Letra del Tesoro de"
+          f" EE.UU. a 13 semanas) entre {inicio} y {fin}: {tasa:.2f}%")
+    tasa_libre_riesgo = pedir_tasa("Tasa libre de riesgo anual en %", tasa)
+
+    resumenes = {
+        ticker: resumen(datos["Close"], intervalo, tasa_libre_riesgo)
+        for ticker, datos in validos.items()
+    }
+    print(f"\n{', '.join(validos)} | {inicio} a {fin} | intervalo {intervalo}\n")
+    if len(validos) == 1:
+        ticker = next(iter(validos))
+        mostrar_detalle(ticker, validos[ticker], resumenes[ticker], tasa_libre_riesgo)
+    else:
+        mostrar_comparativa(resumenes, tasa_libre_riesgo)
 
 
 if __name__ == "__main__":

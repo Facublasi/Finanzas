@@ -41,6 +41,21 @@ def pedir_frecuencia() -> str:
         print("  Opción inválida. Elegí 1, 2 o 3.")
 
 
+def pedir_tasa(mensaje: str, defecto: float) -> float:
+    """Pide una tasa en porcentaje (ej. 4.5) y la devuelve en decimal (0.045)."""
+    while True:
+        valor = pedir_texto(mensaje, f"{defecto:g}").replace(",", ".")
+        try:
+            tasa = float(valor)
+        except ValueError:
+            print("  Tasa inválida. Ingresá un número, por ejemplo 4.5 para 4,5%.")
+            continue
+        if tasa <= -100:
+            print("  La tasa tiene que ser mayor a -100%.")
+            continue
+        return tasa / 100
+
+
 def descargar(ticker: str, inicio: date, fin: date, intervalo: str):
     """Devuelve precios de `ticker` entre `inicio` y `fin` (ambos incluidos)."""
     # yfinance no incluye la fecha de fin, por eso se le suma un día.
@@ -59,6 +74,9 @@ def main():
             break
         print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
     intervalo = pedir_frecuencia()
+    tasa_libre_riesgo = pedir_tasa(
+        "Tasa libre de riesgo anual en % (en la moneda del activo)", 4.0
+    )
 
     datos = descargar(ticker, inicio, fin, intervalo)
     if datos.empty:
@@ -71,12 +89,18 @@ def main():
     if len(datos) < 3:
         print("\nHacen falta al menos 3 precios para calcular la volatilidad.")
         return
-    r = resumen(datos["Close"], intervalo)
+    r = resumen(datos["Close"], intervalo, tasa_libre_riesgo)
     print(f"\nResumen ({r['observaciones']} retornos)")
     print(f"  Retorno logarítmico total:  {r['retorno_log_total']:8.2%}")
     print(f"  Retorno logarítmico medio:  {r['retorno_log_medio']:8.4%} por período")
+    print(f"  Retorno logarítmico anual:  {r['retorno_log_anual']:8.2%}")
     print(f"  Volatilidad:                {r['volatilidad_periodo']:8.4%} por período")
     print(f"  Volatilidad anualizada:     {r['volatilidad_anual']:8.2%}")
+    print(
+        f"  Tasa libre de riesgo:       {tasa_libre_riesgo:8.2%}"
+        f" (log: {r['tasa_libre_riesgo_log']:.2%})"
+    )
+    print(f"  Sharpe ratio:               {r['sharpe']:8.2f}")
 
 
 if __name__ == "__main__":

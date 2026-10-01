@@ -19,18 +19,35 @@ def retornos_log(precios: pd.Series) -> pd.Series:
     return np.log(precios / precios.shift(1)).dropna()
 
 
-def resumen(precios: pd.Series, intervalo: str) -> dict:
-    """Retorno logarítmico total y volatilidad (por período y anualizada)."""
+def resumen(precios: pd.Series, intervalo: str, tasa_libre_riesgo: float) -> dict:
+    """Retorno, volatilidad y Sharpe ratio, todo en términos anuales.
+
+    `tasa_libre_riesgo` es la tasa efectiva anual en decimal (0.04 = 4%).
+    """
     retornos = retornos_log(precios)
     periodos = PERIODOS_POR_ANIO[intervalo]
+    retorno_medio = retornos.mean()
     # Desvío estándar muestral (ddof=1) de los retornos logarítmicos.
     volatilidad = retornos.std(ddof=1)
+
+    # Anualización: retorno medio por período × períodos en un año. Sirve igual
+    # si el plazo es menor o mayor a un año, porque parte del promedio por
+    # período y no del total acumulado.
+    retorno_anual = retorno_medio * periodos
+    volatilidad_anual = volatilidad * np.sqrt(periodos)
+    # La tasa libre de riesgo se pasa a logarítmica para restar en la misma
+    # escala que el retorno: ln(1 + rf).
+    tasa_log = np.log(1 + tasa_libre_riesgo)
+
     return {
         "observaciones": len(retornos),
         # Los retornos logarítmicos se suman: el total es ln(P_fin / P_inicio).
         "retorno_log_total": retornos.sum(),
-        "retorno_log_medio": retornos.mean(),
+        "retorno_log_medio": retorno_medio,
+        "retorno_log_anual": retorno_anual,
         "volatilidad_periodo": volatilidad,
         # Regla de la raíz del tiempo para llevar la volatilidad a un año.
-        "volatilidad_anual": volatilidad * np.sqrt(periodos),
+        "volatilidad_anual": volatilidad_anual,
+        "tasa_libre_riesgo_log": tasa_log,
+        "sharpe": (retorno_anual - tasa_log) / volatilidad_anual,
     }

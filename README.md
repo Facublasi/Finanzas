@@ -17,7 +17,7 @@ python src/cotizaciones.py
 El programa pide los datos por teclado. Si apretás Enter sin escribir nada, usa el valor entre corchetes.
 
 ```
-Ticker (acciones de BYMA llevan sufijo .BA) [GGAL]: YPFD.BA
+Ticker (tiene que cotizar en USD) [GGAL]: AAPL
 Fecha de inicio (AAAA-MM-DD) [2026-09-01]: 2026-01-01
 Fecha de fin (AAAA-MM-DD) [2026-10-01]: 2026-06-30
 Frecuencia:
@@ -26,11 +26,13 @@ Frecuencia:
   3) Mensual
 Elegí una opción [1]: 2
 
-El activo cotiza en ARS: ingresá una tasa libre de riesgo en esa moneda.
-Tasa libre de riesgo anual en % (ARS) [5]: 30
+Tasa libre de riesgo: promedio de ^IRX (Letra del Tesoro de EE.UU. a 13 semanas) entre 2026-01-01 y 2026-06-30: 3.66%
+Tasa libre de riesgo anual en % [3.66]:
 ```
 
 Muestra apertura, máximo, mínimo, cierre y volumen. Las fechas de inicio y fin están incluidas.
+
+Solo se analizan activos que cotizan en **USD** (por ejemplo `AAPL` o `GGAL`, el ADR en NYSE). Si el ticker cotiza en otra moneda (como `GGAL.BA`, en pesos), el programa avisa y termina.
 
 ## Retornos y volatilidad
 
@@ -41,8 +43,6 @@ Además de los precios, el programa calcula con los precios de cierre (`src/metr
 - **Volatilidad**: desvío estándar muestral de los retornos logarítmicos.
 - **Volatilidad anualizada**: volatilidad × √(períodos por año), con 252 días hábiles, 52 semanas o 12 meses según la frecuencia elegida.
 - **Retorno logarítmico anualizado**: retorno medio por período × períodos por año. Funciona igual para plazos menores o mayores a un año.
-- **Sharpe ratio**: `(retorno anualizado − ln(1 + rf)) / volatilidad anualizada`. La tasa libre de riesgo `rf` se ingresa como tasa efectiva anual y se pasa a logarítmica para restarla en la misma escala que el retorno. Tiene que estar en la misma moneda que el activo:
-  - **Activos en USD**: el valor por defecto es el promedio de `^IRX` (rendimiento de la Letra del Tesoro de EE.UU. a 13 semanas) entre la fecha de inicio y la de fin. Se acepta con Enter o se escribe otra.
-  - **Otras monedas** (por ejemplo pesos en tickers `.BA`): hay que ingresarla a mano; el valor por defecto es 5%.
+- **Sharpe ratio**: `(retorno anualizado − ln(1 + rf)) / volatilidad anualizada`. La tasa libre de riesgo `rf` se ingresa como tasa efectiva anual y se pasa a logarítmica para restarla en la misma escala que el retorno. Siempre es la tasa de EE.UU.: el valor por defecto es el promedio de `^IRX` (rendimiento de la Letra del Tesoro a 13 semanas) entre la fecha de inicio y la de fin. Se acepta con Enter o se escribe otra.
 
 Los precios que devuelve yfinance están ajustados por dividendos y splits.

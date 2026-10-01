@@ -12,6 +12,23 @@ MONEDA = "USD"
 # EE.UU. a 13 semanas.
 TICKER_TASA = "^IRX"
 
+# Acciones argentinas: ticker en BYMA (pesos) -> ADR en EE.UU. (dólares).
+ADRS = {
+    "GGAL.BA": "GGAL",
+    "YPFD.BA": "YPF",
+    "PAMP.BA": "PAM",
+    "BMA.BA": "BMA",
+    "BBAR.BA": "BBAR",
+    "SUPV.BA": "SUPV",
+    "CEPU.BA": "CEPU",
+    "EDN.BA": "EDN",
+    "TGSU2.BA": "TGS",
+    "TECO2.BA": "TEO",
+    "LOMA.BA": "LOMA",
+    "CRES.BA": "CRESY",
+    "IRSA.BA": "IRS",
+}
+
 FRECUENCIAS = {
     "1": ("1d", "Diaria"),
     "2": ("1wk", "Semanal"),
@@ -85,7 +102,11 @@ def tasa_promedio(inicio: date, fin: date):
 
 def main():
     hoy = date.today()
-    ticker = pedir_texto("Ticker (tiene que cotizar en USD)", "GGAL").upper()
+    while True:
+        ticker = pedir_texto("Ticker (tiene que cotizar en USD)", "GGAL").upper()
+        if ticker not in ADRS:
+            break
+        print(f"  {ticker} cotiza en pesos. Para acciones argentinas usá el ADR: {ADRS[ticker]}")
     while True:
         inicio = pedir_fecha("Fecha de inicio (AAAA-MM-DD)", hoy - timedelta(days=30))
         fin = pedir_fecha("Fecha de fin (AAAA-MM-DD)", hoy)
@@ -99,7 +120,8 @@ def main():
         print(f"\nNo se encontraron datos para {ticker} en ese rango.")
         return
     if moneda != MONEDA:
-        print(f"\n{ticker} cotiza en {moneda}. Solo se analizan activos en {MONEDA}.")
+        print(f"\n{ticker} cotiza en {moneda}. Solo se analizan activos en {MONEDA}"
+              " (para acciones argentinas, usá el ADR).")
         return
     tasa = tasa_promedio(inicio, fin)
     if tasa is None:

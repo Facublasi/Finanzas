@@ -34,6 +34,24 @@ Muestra apertura, máximo, mínimo, cierre y volumen. Las fechas de inicio y fin
 
 Solo se analizan activos que cotizan en **USD** (por ejemplo `AAPL` o `GGAL`, el ADR en NYSE). Si el ticker cotiza en otra moneda (como `GGAL.BA`, en pesos), el programa avisa y termina.
 
+Para **acciones argentinas** se usa el **ADR** que cotiza en EE.UU. Si se ingresa el ticker de BYMA, el programa indica cuál es el ADR:
+
+| BYMA | ADR |
+|---|---|
+| GGAL.BA | GGAL |
+| YPFD.BA | YPF |
+| PAMP.BA | PAM |
+| BMA.BA | BMA |
+| BBAR.BA | BBAR |
+| SUPV.BA | SUPV |
+| CEPU.BA | CEPU |
+| EDN.BA | EDN |
+| TGSU2.BA | TGS |
+| TECO2.BA | TEO |
+| LOMA.BA | LOMA |
+| CRES.BA | CRESY |
+| IRSA.BA | IRS |
+
 ## Retornos y volatilidad
 
 Además de los precios, el programa calcula con los precios de cierre (`src/metricas.py`):

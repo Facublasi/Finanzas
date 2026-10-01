@@ -26,8 +26,8 @@ Frecuencia:
   3) Mensual
 Elegí una opción [1]: 2
 
-Tasa libre de riesgo: promedio de ^IRX (Letra del Tesoro de EE.UU. a 13 semanas) entre 2026-01-01 y 2026-06-30: 3.66%
-Tasa libre de riesgo anual en % [3.66]:
+Tasa libre de riesgo: promedio de ^IRX (Letra del Tesoro de EE.UU. a 13 semanas) entre 2026-01-01 y 2026-06-30: 3.6%
+Tasa libre de riesgo anual en % [3.6]:
 ```
 
 Muestra apertura, máximo, mínimo, cierre y volumen. Las fechas de inicio y fin están incluidas.

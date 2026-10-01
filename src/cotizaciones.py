@@ -75,7 +75,7 @@ def main():
         print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
     intervalo = pedir_frecuencia()
     tasa_libre_riesgo = pedir_tasa(
-        "Tasa libre de riesgo anual en % (en la moneda del activo)", 4.0
+        "Tasa libre de riesgo anual en % (en la moneda del activo)", 5.0
     )
 
     datos = descargar(ticker, inicio, fin, intervalo)

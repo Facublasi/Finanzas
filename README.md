@@ -25,7 +25,7 @@ Frecuencia:
   2) Semanal
   3) Mensual
 Elegí una opción [1]: 2
-Tasa libre de riesgo anual en % (en la moneda del activo) [4]: 4.5
+Tasa libre de riesgo anual en % (en la moneda del activo) [5]: 4.5
 ```
 
 Muestra apertura, máximo, mínimo, cierre y volumen. Las fechas de inicio y fin están incluidas.

@@ -7,28 +7,9 @@ import yfinance as yf
 
 from metricas import resumen, retornos_log
 
-# Todos los activos se analizan en dólares.
-MONEDA = "USD"
 # Tasa libre de riesgo: rendimiento anual (en %) de la Letra del Tesoro de
 # EE.UU. a 13 semanas.
 TICKER_TASA = "^IRX"
-
-# Acciones argentinas: ticker en BYMA (pesos) -> ADR en EE.UU. (dólares).
-ADRS = {
-    "GGAL.BA": "GGAL",
-    "YPFD.BA": "YPF",
-    "PAMP.BA": "PAM",
-    "BMA.BA": "BMA",
-    "BBAR.BA": "BBAR",
-    "SUPV.BA": "SUPV",
-    "CEPU.BA": "CEPU",
-    "EDN.BA": "EDN",
-    "TGSU2.BA": "TGS",
-    "TECO2.BA": "TEO",
-    "LOMA.BA": "LOMA",
-    "CRES.BA": "CRESY",
-    "IRSA.BA": "IRS",
-}
 
 FRECUENCIAS = {
     "1": ("1d", "Diaria"),
@@ -44,13 +25,13 @@ def pedir_texto(mensaje: str, defecto: str) -> str:
 
 
 def pedir_fecha(mensaje: str, defecto: date) -> date:
-    """Pide una fecha en formato AAAA-MM-DD hasta que sea válida."""
+    """Pide una fecha en formato DD-MM-AAAA (o DD/MM/AAAA) hasta que sea válida."""
     while True:
-        valor = pedir_texto(mensaje, defecto.isoformat())
+        valor = pedir_texto(mensaje, defecto.strftime("%d-%m-%Y")).replace("/", "-")
         try:
-            return datetime.strptime(valor, "%Y-%m-%d").date()
+            return datetime.strptime(valor, "%d-%m-%Y").date()
         except ValueError:
-            print("  Fecha inválida. Usá el formato AAAA-MM-DD, por ejemplo 2025-01-31.")
+            print("  Fecha inválida. Usá el formato DD-MM-AAAA, por ejemplo 31-01-2025.")
 
 
 def pedir_frecuencia() -> str:
@@ -65,21 +46,6 @@ def pedir_frecuencia() -> str:
         print("  Opción inválida. Elegí 1, 2 o 3.")
 
 
-def pedir_tasa(mensaje: str, defecto: float) -> float:
-    """Pide una tasa en porcentaje (ej. 4.5) y la devuelve en decimal (0.045)."""
-    while True:
-        valor = pedir_texto(mensaje, f"{defecto:g}").replace(",", ".")
-        try:
-            tasa = float(valor)
-        except ValueError:
-            print("  Tasa inválida. Ingresá un número, por ejemplo 4.5 para 4,5%.")
-            continue
-        if tasa <= -100:
-            print("  La tasa tiene que ser mayor a -100%.")
-            continue
-        return tasa / 100
-
-
 def descargar(ticker: str, inicio: date, fin: date, intervalo: str):
     """Devuelve los precios de `ticker` entre `inicio` y `fin` (ambos incluidos)
     y la moneda en la que cotiza (por ejemplo "USD" o "ARS")."""
@@ -91,26 +57,19 @@ def descargar(ticker: str, inicio: date, fin: date, intervalo: str):
 
 
 def tasa_promedio(inicio: date, fin: date):
-    """Promedio del rendimiento de ^IRX entre `inicio` y `fin`, en %.
-
-    Devuelve None si no hay datos para ese rango.
-    """
+    """Promedio del rendimiento de ^IRX entre `inicio` y `fin`, en decimal
+    (0.0366 = 3,66%). Devuelve None si no hay datos para ese rango."""
     datos, _ = descargar(TICKER_TASA, inicio, fin, "1d")
     if datos.empty:
         return None
-    return round(float(datos["Close"].mean()), 2)
+    return float(datos["Close"].mean()) / 100
 
 
 def pedir_tickers() -> list:
     """Pide uno o varios tickers separados por coma o espacio."""
-    while True:
-        valor = pedir_texto("Tickers separados por coma (tienen que cotizar en USD)", "GGAL")
-        tickers = list(dict.fromkeys(valor.upper().replace(",", " ").split()))
-        locales = [t for t in tickers if t in ADRS]
-        if not locales:
-            return tickers
-        for t in locales:
-            print(f"  {t} cotiza en pesos. Para acciones argentinas usá el ADR: {ADRS[t]}")
+    valor = pedir_texto("Tickers separados por coma", "AAPL")
+    # Pasa a mayúsculas, separa y elimina repetidos manteniendo el orden.
+    return list(dict.fromkeys(valor.upper().replace(",", " ").split()))
 
 
 def descargar_validos(tickers: list, inicio: date, fin: date, intervalo: str) -> dict:
@@ -120,9 +79,9 @@ def descargar_validos(tickers: list, inicio: date, fin: date, intervalo: str) ->
         datos, moneda = descargar(ticker, inicio, fin, intervalo)
         if datos.empty:
             print(f"  {ticker}: no se encontraron datos en ese rango, se omite.")
-        elif moneda != MONEDA:
-            print(f"  {ticker}: cotiza en {moneda}, se omite (solo se analizan activos"
-                  f" en {MONEDA}; para acciones argentinas, usá el ADR).")
+        elif moneda != "USD":
+            # La tasa libre de riesgo es en dólares: el activo también tiene que serlo.
+            print(f"  {ticker}: cotiza en {moneda}, no en USD, se omite.")
         elif len(datos) < 3:
             print(f"  {ticker}: hacen falta al menos 3 precios para calcular la"
                   " volatilidad, se omite.")
@@ -143,7 +102,7 @@ def mostrar_detalle(ticker: str, datos, r: dict, tasa_libre_riesgo: float):
     print(f"  Volatilidad anualizada:     {r['volatilidad_anual']:8.2%}")
     print(
         f"  Tasa libre de riesgo:       {tasa_libre_riesgo:8.2%}"
-        f" (log: {r['tasa_libre_riesgo_log']:.2%})"
+        f" (promedio de {TICKER_TASA}; log: {r['tasa_libre_riesgo_log']:.2%})"
     )
     print(f"  Sharpe ratio:               {r['sharpe']:8.2f}")
 
@@ -166,15 +125,15 @@ def mostrar_comparativa(resumenes: dict, tasa_libre_riesgo: float):
         "Volatilidad anual": porcentaje,
         "Sharpe": "{:.2f}".format,
     }))
-    print(f"\nTasa libre de riesgo: {tasa_libre_riesgo:.2%}")
+    print(f"\nTasa libre de riesgo (promedio de {TICKER_TASA}): {tasa_libre_riesgo:.2%}")
 
 
 def main():
     hoy = date.today()
     tickers = pedir_tickers()
     while True:
-        inicio = pedir_fecha("Fecha de inicio (AAAA-MM-DD)", hoy - timedelta(days=30))
-        fin = pedir_fecha("Fecha de fin (AAAA-MM-DD)", hoy)
+        inicio = pedir_fecha("Fecha de inicio (DD-MM-AAAA)", hoy - timedelta(days=30))
+        fin = pedir_fecha("Fecha de fin (DD-MM-AAAA)", hoy)
         if inicio <= fin:
             break
         print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
@@ -185,19 +144,16 @@ def main():
     if not validos:
         print("\nNo quedó ningún activo para analizar.")
         return
-    tasa = tasa_promedio(inicio, fin)
-    if tasa is None:
-        print(f"\nNo hay datos de {TICKER_TASA} entre {inicio} y {fin}.")
+    tasa_libre_riesgo = tasa_promedio(inicio, fin)
+    if tasa_libre_riesgo is None:
+        print(f"\nNo hay datos de {TICKER_TASA} entre {inicio:%d-%m-%Y} y {fin:%d-%m-%Y}.")
         return
-    print(f"\nTasa libre de riesgo: promedio de {TICKER_TASA} (Letra del Tesoro de"
-          f" EE.UU. a 13 semanas) entre {inicio} y {fin}: {tasa:.2f}%")
-    tasa_libre_riesgo = pedir_tasa("Tasa libre de riesgo anual en %", tasa)
 
     resumenes = {
         ticker: resumen(datos["Close"], intervalo, tasa_libre_riesgo)
         for ticker, datos in validos.items()
     }
-    print(f"\n{', '.join(validos)} | {inicio} a {fin} | intervalo {intervalo}\n")
+    print(f"\n{', '.join(validos)} | {inicio:%d-%m-%Y} a {fin:%d-%m-%Y} | intervalo {intervalo}\n")
     if len(validos) == 1:
         ticker = next(iter(validos))
         mostrar_detalle(ticker, validos[ticker], resumenes[ticker], tasa_libre_riesgo)

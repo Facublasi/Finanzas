@@ -17,62 +17,40 @@ python src/cotizaciones.py
 El programa pide los datos por teclado. Si apretás Enter sin escribir nada, usa el valor entre corchetes.
 
 ```
-Tickers separados por coma (tienen que cotizar en USD) [GGAL]: AAPL, YPF, KO
-Fecha de inicio (AAAA-MM-DD) [2026-09-01]: 2026-01-01
-Fecha de fin (AAAA-MM-DD) [2026-10-01]: 2026-06-30
+Tickers separados por coma [AAPL]: JPM, BA, AAL, XOM
+Fecha de inicio (DD-MM-AAAA) [02-09-2026]: 01-04-2021
+Fecha de fin (DD-MM-AAAA) [02-10-2026]: 01-03-2026
 Frecuencia:
   1) Diaria
   2) Semanal
   3) Mensual
-Elegí una opción [1]: 2
-
-Tasa libre de riesgo: promedio de ^IRX (Letra del Tesoro de EE.UU. a 13 semanas) entre 2026-01-01 y 2026-06-30: 3.6%
-Tasa libre de riesgo anual en % [3.6]:
+Elegí una opción [1]: 3
 ```
 
-Se pueden ingresar uno o varios tickers, separados por coma o espacio. Las fechas de inicio y fin están incluidas.
-
+- Las fechas se escriben DD-MM-AAAA (también se acepta DD/MM/AAAA). Las fechas de inicio y fin están incluidas.
+- Los activos tienen que cotizar en USD, porque la tasa libre de riesgo es en dólares. Los que no tienen datos, no cotizan en USD o tienen menos de 3 precios se omiten con un aviso.
 - **Un ticker**: muestra la tabla de precios (apertura, máximo, mínimo, cierre, volumen y retorno logarítmico) y el resumen de métricas.
-- **Varios tickers**: muestra una tabla comparativa con una fila por activo, ordenada de mayor a menor Sharpe:
+- **Varios tickers**: muestra una tabla comparativa ordenada de mayor a menor Sharpe:
 
 ```
-      Retornos Ret. log total Ret. log anual Volatilidad anual Sharpe
-KO         187         23.89%         32.19%            19.43%   1.47
-YPF        187         30.58%         41.21%            38.91%   0.97
-AAPL       187         20.06%         27.04%            26.86%   0.87
+     Retornos Ret. log total Ret. log anual Volatilidad anual Sharpe
+XOM        59        127.81%         25.99%            25.56%   0.89
+JPM        59         76.97%         15.65%            23.41%   0.53
+BA         59        -16.32%         -3.32%            35.64%  -0.19
+AAL        59        -70.43%        -14.32%            41.89%  -0.42
+
+Tasa libre de riesgo (promedio de ^IRX): 3.38%
 ```
 
-Los tickers sin datos, que no cotizan en USD o con menos de 3 precios se omiten con un aviso y se sigue con el resto.
+## Cálculos
 
-Solo se analizan activos que cotizan en **USD** (por ejemplo `AAPL` o `GGAL`, el ADR en NYSE). Si el ticker cotiza en otra moneda (como `GGAL.BA`, en pesos), el programa avisa y termina.
+Con los precios de cierre (`src/metricas.py`):
 
-Para **acciones argentinas** se usa el **ADR** que cotiza en EE.UU. Si se ingresa el ticker de BYMA, el programa indica cuál es el ADR:
-
-| BYMA | ADR |
-|---|---|
-| GGAL.BA | GGAL |
-| YPFD.BA | YPF |
-| PAMP.BA | PAM |
-| BMA.BA | BMA |
-| BBAR.BA | BBAR |
-| SUPV.BA | SUPV |
-| CEPU.BA | CEPU |
-| EDN.BA | EDN |
-| TGSU2.BA | TGS |
-| TECO2.BA | TEO |
-| LOMA.BA | LOMA |
-| CRES.BA | CRESY |
-| IRSA.BA | IRS |
-
-## Retornos y volatilidad
-
-Además de los precios, el programa calcula con los precios de cierre (`src/metricas.py`):
-
-- **Retorno logarítmico** de cada período: `ln(P_t / P_t-1)` (columna `Ret. log`).
-- **Retorno logarítmico total**: suma de los retornos del período, igual a `ln(P_fin / P_inicio)`.
+- **Retorno logarítmico** de cada período: `ln(P_t / P_t-1)`.
+- **Retorno logarítmico total**: suma de los retornos, igual a `ln(P_fin / P_inicio)`.
 - **Volatilidad**: desvío estándar muestral de los retornos logarítmicos.
-- **Volatilidad anualizada**: volatilidad × √(períodos por año), con 252 días hábiles, 52 semanas o 12 meses según la frecuencia elegida.
-- **Retorno logarítmico anualizado**: retorno medio por período × períodos por año. Funciona igual para plazos menores o mayores a un año.
-- **Sharpe ratio**: `(retorno anualizado − ln(1 + rf)) / volatilidad anualizada`. La tasa libre de riesgo `rf` se ingresa como tasa efectiva anual y se pasa a logarítmica para restarla en la misma escala que el retorno. Siempre es la tasa de EE.UU.: el valor por defecto es el promedio de `^IRX` (rendimiento de la Letra del Tesoro a 13 semanas) entre la fecha de inicio y la de fin. Se acepta con Enter o se escribe otra.
+- **Anualización**: retorno medio × períodos por año y volatilidad × √(períodos por año), con 252 días hábiles, 52 semanas o 12 meses según la frecuencia. Funciona igual para plazos menores o mayores a un año.
+- **Tasa libre de riesgo**: promedio de `^IRX` (rendimiento anual de la Letra del Tesoro de EE.UU. a 13 semanas) entre la fecha de inicio y la de fin. Se calcula sola, no se pregunta.
+- **Sharpe ratio**: `(retorno anualizado − ln(1 + rf)) / volatilidad anualizada`. La tasa se pasa a logarítmica para restarla en la misma escala que el retorno.
 
-Los precios que devuelve yfinance están ajustados por dividendos y splits.
+Los precios que devuelve yfinance están ajustados por dividendos y splits. Con frecuencia mensual, cada precio es el cierre del último día hábil del mes.

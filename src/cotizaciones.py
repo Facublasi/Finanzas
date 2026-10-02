@@ -65,11 +65,37 @@ def tasa_promedio(inicio: date, fin: date):
     return float(datos["Close"].mean()) / 100
 
 
-def pedir_tickers() -> list:
-    """Pide uno o varios tickers separados por coma o espacio."""
-    valor = pedir_texto("Tickers separados por coma", "AAPL")
-    # Pasa a mayúsculas, separa y elimina repetidos manteniendo el orden.
-    return list(dict.fromkeys(valor.upper().replace(",", " ").split()))
+def pedir_cartera() -> dict:
+    """Pide los tickers con su peso en % (ej. "JPM 40, BA 60") hasta que los
+    datos sean válidos y los pesos sumen 100%. Devuelve {ticker: peso decimal}."""
+    while True:
+        valor = pedir_texto("Tickers y peso en % (ej: JPM 40, BA 60)", "AAPL 100")
+        cartera = {}
+        error = None
+        for parte in valor.upper().replace("%", "").split(","):
+            elementos = parte.split()
+            if len(elementos) != 2:
+                error = f"'{parte.strip()}' tiene que ser un ticker y su peso, por ejemplo JPM 40."
+                break
+            ticker, peso = elementos
+            try:
+                peso = float(peso)
+            except ValueError:
+                error = f"El peso de {ticker} no es un número."
+                break
+            if peso <= 0:
+                error = f"El peso de {ticker} tiene que ser mayor a 0."
+                break
+            if ticker in cartera:
+                error = f"{ticker} está repetido."
+                break
+            cartera[ticker] = peso
+        if error is None:
+            total = sum(cartera.values())
+            if abs(total - 100) < 1e-9:
+                return {ticker: peso / 100 for ticker, peso in cartera.items()}
+            error = f"Los pesos suman {total:g}%, tienen que sumar 100%."
+        print(f"  {error}")
 
 
 def descargar_validos(tickers: list, inicio: date, fin: date, intervalo: str) -> dict:
@@ -107,10 +133,11 @@ def mostrar_detalle(ticker: str, datos, r: dict, tasa_libre_riesgo: float):
     print(f"  Sharpe ratio:               {r['sharpe']:8.2f}")
 
 
-def mostrar_comparativa(resumenes: dict, tasa_libre_riesgo: float):
+def mostrar_comparativa(resumenes: dict, cartera: dict, tasa_libre_riesgo: float):
     """Tabla con una fila por activo, ordenada de mayor a menor Sharpe."""
     tabla = pd.DataFrame(
         {
+            "Peso": cartera,
             "Retornos": {t: r["observaciones"] for t, r in resumenes.items()},
             "Ret. log total": {t: r["retorno_log_total"] for t, r in resumenes.items()},
             "Ret. log anual": {t: r["retorno_log_anual"] for t, r in resumenes.items()},
@@ -120,6 +147,7 @@ def mostrar_comparativa(resumenes: dict, tasa_libre_riesgo: float):
     ).sort_values("Sharpe", ascending=False)
     porcentaje = "{:.2%}".format
     print(tabla.to_string(formatters={
+        "Peso": porcentaje,
         "Ret. log total": porcentaje,
         "Ret. log anual": porcentaje,
         "Volatilidad anual": porcentaje,
@@ -130,7 +158,7 @@ def mostrar_comparativa(resumenes: dict, tasa_libre_riesgo: float):
 
 def main():
     hoy = date.today()
-    tickers = pedir_tickers()
+    cartera = pedir_cartera()
     while True:
         inicio = pedir_fecha("Fecha de inicio (DD-MM-AAAA)", hoy - timedelta(days=30))
         fin = pedir_fecha("Fecha de fin (DD-MM-AAAA)", hoy)
@@ -140,9 +168,10 @@ def main():
     intervalo = pedir_frecuencia()
 
     print()
-    validos = descargar_validos(tickers, inicio, fin, intervalo)
-    if not validos:
-        print("\nNo quedó ningún activo para analizar.")
+    validos = descargar_validos(list(cartera), inicio, fin, intervalo)
+    if len(validos) < len(cartera):
+        # Sin todos los activos, los pesos de la cartera ya no suman 100%.
+        print("\nNo se pudieron descargar todos los activos de la cartera.")
         return
     tasa_libre_riesgo = tasa_promedio(inicio, fin)
     if tasa_libre_riesgo is None:
@@ -158,7 +187,7 @@ def main():
         ticker = next(iter(validos))
         mostrar_detalle(ticker, validos[ticker], resumenes[ticker], tasa_libre_riesgo)
     else:
-        mostrar_comparativa(resumenes, tasa_libre_riesgo)
+        mostrar_comparativa(resumenes, cartera, tasa_libre_riesgo)
 
 
 if __name__ == "__main__":

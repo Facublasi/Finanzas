@@ -17,7 +17,7 @@ python src/cotizaciones.py
 El programa pide los datos por teclado. Si apretás Enter sin escribir nada, usa el valor entre corchetes.
 
 ```
-Tickers separados por coma [AAPL]: JPM, BA, AAL, XOM
+Tickers y peso en % (ej: JPM 40, BA 60) [AAPL 100]: JPM 40, BA 30, AAL 20, XOM 10
 Fecha de inicio (DD-MM-AAAA) [02-09-2026]: 01-04-2021
 Fecha de fin (DD-MM-AAAA) [02-10-2026]: 01-03-2026
 Frecuencia:
@@ -27,17 +27,18 @@ Frecuencia:
 Elegí una opción [1]: 3
 ```
 
+- Cada activo se escribe con su peso en la cartera, en %, separados por coma. Los pesos tienen que ser mayores a 0 y sumar 100%; si no, el programa avisa y vuelve a preguntar. Para decimales se usa punto (ej: `AAPL 33.33`).
 - Las fechas se escriben DD-MM-AAAA (también se acepta DD/MM/AAAA). Las fechas de inicio y fin están incluidas.
-- Los activos tienen que cotizar en USD, porque la tasa libre de riesgo es en dólares. Los que no tienen datos, no cotizan en USD o tienen menos de 3 precios se omiten con un aviso.
+- Los activos tienen que cotizar en USD, porque la tasa libre de riesgo es en dólares. Si algún activo no tiene datos, no cotiza en USD o tiene menos de 3 precios, el programa avisa y termina, porque sin él los pesos ya no suman 100%.
 - **Un ticker**: muestra la tabla de precios (apertura, máximo, mínimo, cierre, volumen y retorno logarítmico) y el resumen de métricas.
 - **Varios tickers**: muestra una tabla comparativa ordenada de mayor a menor Sharpe:
 
 ```
-     Retornos Ret. log total Ret. log anual Volatilidad anual Sharpe
-XOM        59        127.81%         25.99%            25.56%   0.89
-JPM        59         76.97%         15.65%            23.41%   0.53
-BA         59        -16.32%         -3.32%            35.64%  -0.19
-AAL        59        -70.43%        -14.32%            41.89%  -0.42
+      Peso  Retornos Ret. log total Ret. log anual Volatilidad anual Sharpe
+XOM 10.00%        59        127.81%         25.99%            25.56%   0.89
+JPM 40.00%        59         76.97%         15.65%            23.41%   0.53
+BA  30.00%        59        -16.32%         -3.32%            35.64%  -0.19
+AAL 20.00%        59        -70.43%        -14.32%            41.89%  -0.42
 
 Tasa libre de riesgo (promedio de ^IRX): 3.38%
 ```

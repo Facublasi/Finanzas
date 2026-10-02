@@ -53,13 +53,37 @@ def resumen(precios: pd.Series, intervalo: str, tasa_libre_riesgo: float) -> dic
     }
 
 
-def retorno_esperado_cartera(resumenes: dict, cartera: dict) -> dict:
-    """Retorno esperado de la cartera: promedio ponderado de los retornos
-    esperados de cada activo, E(Rp) = Σ w_i · E(R_i).
+def resumen_cartera(
+    precios: dict, cartera: dict, intervalo: str, tasa_libre_riesgo: float
+) -> dict:
+    """Retorno esperado, volatilidad y Sharpe de la cartera.
 
-    `resumenes` es {ticker: resumen(...)} y `cartera` es {ticker: peso decimal}.
+    `precios` es {ticker: serie de precios de cierre} y `cartera` es
+    {ticker: peso decimal}. Los pesos se mantienen fijos en todo el período.
     """
+    # Retornos de todos los activos en una tabla, alineados por fecha (solo
+    # fechas en las que hay precio de todos).
+    retornos = pd.DataFrame({t: retornos_log(p) for t, p in precios.items()}).dropna()
+    pesos = np.array([cartera[t] for t in retornos.columns])
+    periodos = PERIODOS_POR_ANIO[intervalo]
+
+    # Retorno esperado: E(Rp) = Σ w_i · E(R_i).
+    retorno_periodo = float(pesos @ retornos.mean())
+    # Matriz de covarianzas muestral (ddof=1, igual que la volatilidad de cada activo).
+    covarianzas = retornos.cov(ddof=1)
+    # Volatilidad: σp = √(wᵀ · Σ · w).
+    volatilidad_periodo = float(np.sqrt(pesos @ covarianzas.values @ pesos))
+
+    retorno_anual = retorno_periodo * periodos
+    volatilidad_anual = volatilidad_periodo * np.sqrt(periodos)
+    tasa_log = np.log(1 + tasa_libre_riesgo)
     return {
-        "por_periodo": sum(cartera[t] * r["retorno_log_medio"] for t, r in resumenes.items()),
-        "anual": sum(cartera[t] * r["retorno_log_anual"] for t, r in resumenes.items()),
+        "observaciones": len(retornos),
+        "retorno_periodo": retorno_periodo,
+        "retorno_anual": retorno_anual,
+        "volatilidad_periodo": volatilidad_periodo,
+        "volatilidad_anual": volatilidad_anual,
+        "sharpe": (retorno_anual - tasa_log) / volatilidad_anual,
+        "covarianzas": covarianzas,
+        "correlaciones": retornos.corr(),
     }

@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import yfinance as yf
 
-from metricas import resumen, retorno_esperado_cartera, retornos_log
+from metricas import resumen, resumen_cartera, retornos_log
 
 # Tasa libre de riesgo: rendimiento anual (en %) de la Letra del Tesoro de
 # EE.UU. a 13 semanas.
@@ -156,6 +156,23 @@ def mostrar_comparativa(resumenes: dict, cartera: dict, tasa_libre_riesgo: float
     print(f"\nTasa libre de riesgo (promedio de {TICKER_TASA}): {tasa_libre_riesgo:.2%}")
 
 
+def mostrar_cartera(c: dict):
+    """Matrices de covarianzas y correlaciones, y métricas de la cartera."""
+    if len(c["covarianzas"]) > 1:
+        print("\nMatriz de covarianzas (por período)")
+        print(c["covarianzas"].to_string(float_format="{:.6f}".format))
+        print("\nMatriz de correlaciones")
+        print(c["correlaciones"].to_string(float_format="{:.4f}".format))
+    print(f"\nCartera ({c['observaciones']} retornos)")
+    print("  Retorno esperado, E(Rp) = Σ w_i · E(R_i)")
+    print(f"    Por período:  {c['retorno_periodo']:8.4%}")
+    print(f"    Anual:        {c['retorno_anual']:8.2%}")
+    print("  Volatilidad, σp = √(wᵀ · Σ · w)")
+    print(f"    Por período:  {c['volatilidad_periodo']:8.4%}")
+    print(f"    Anual:        {c['volatilidad_anual']:8.2%}")
+    print(f"  Sharpe ratio:   {c['sharpe']:8.2f}")
+
+
 def main():
     hoy = date.today()
     cartera = pedir_cartera()
@@ -189,10 +206,8 @@ def main():
     else:
         mostrar_comparativa(resumenes, cartera, tasa_libre_riesgo)
 
-    esperado = retorno_esperado_cartera(resumenes, cartera)
-    print("\nRetorno esperado de la cartera, E(Rp) = Σ peso × retorno esperado de cada activo")
-    print(f"  Por período:  {esperado['por_periodo']:8.4%}")
-    print(f"  Anual:        {esperado['anual']:8.2%}")
+    precios = {ticker: datos["Close"] for ticker, datos in validos.items()}
+    mostrar_cartera(resumen_cartera(precios, cartera, intervalo, tasa_libre_riesgo))
 
 
 if __name__ == "__main__":

@@ -42,9 +42,28 @@ AAL 20.00%        59        -70.43%        -14.32%            41.89%  -0.42
 
 Tasa libre de riesgo (promedio de ^IRX): 3.38%
 
-Retorno esperado de la cartera, E(Rp) = Σ peso × retorno esperado de cada activo
-  Por período:   0.4167%
-  Anual:           5.00%
+Matriz de covarianzas (por período)
+         JPM       BA      AAL      XOM
+JPM 0.004566 0.002909 0.003838 0.001274
+BA  0.002909 0.010587 0.003777 0.000300
+AAL 0.003838 0.003777 0.014620 0.000315
+XOM 0.001274 0.000300 0.000315 0.005444
+
+Matriz de correlaciones
+       JPM     BA    AAL    XOM
+JPM 1.0000 0.4184 0.4697 0.2556
+BA  0.4184 1.0000 0.3036 0.0395
+AAL 0.4697 0.3036 1.0000 0.0353
+XOM 0.2556 0.0395 0.0353 1.0000
+
+Cartera (59 retornos)
+  Retorno esperado, E(Rp) = Σ w_i · E(R_i)
+    Por período:   0.4167%
+    Anual:           5.00%
+  Volatilidad, σp = √(wᵀ · Σ · w)
+    Por período:   6.4967%
+    Anual:          22.51%
+  Sharpe ratio:       0.07
 ```
 
 ## Cálculos
@@ -57,6 +76,8 @@ Con los precios de cierre (`src/metricas.py`):
 - **Anualización**: retorno medio × períodos por año y volatilidad × √(períodos por año), con 252 días hábiles, 52 semanas o 12 meses según la frecuencia. Funciona igual para plazos menores o mayores a un año.
 - **Tasa libre de riesgo**: promedio de `^IRX` (rendimiento anual de la Letra del Tesoro de EE.UU. a 13 semanas) entre la fecha de inicio y la de fin. Se calcula sola, no se pregunta.
 - **Retorno esperado de la cartera**: `E(Rp) = Σ w_i · E(R_i)`, el promedio ponderado por los pesos de los retornos esperados (retorno logarítmico medio) de cada activo. Se muestra por período y anualizado.
+- **Volatilidad de la cartera**: `σp = √(wᵀ · Σ · w)`, donde `Σ` es la matriz de covarianzas muestral de los retornos logarítmicos de los activos (alineados por fecha). Se anualiza con √(períodos por año). Los pesos se consideran fijos durante todo el período.
+- **Sharpe de la cartera**: `(E(Rp) anual − ln(1 + rf)) / σp anual`, con el mismo criterio que el Sharpe de cada activo.
 - **Sharpe ratio**: `(retorno anualizado − ln(1 + rf)) / volatilidad anualizada`. La tasa se pasa a logarítmica para restarla en la misma escala que el retorno.
 
 Los precios que devuelve yfinance están ajustados por dividendos y splits. Con frecuencia mensual, cada precio es el cierre del último día hábil del mes.

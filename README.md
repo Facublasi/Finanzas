@@ -41,6 +41,10 @@ BA  30.00%        59        -16.32%         -3.32%            35.64%  -0.19
 AAL 20.00%        59        -70.43%        -14.32%            41.89%  -0.42
 
 Tasa libre de riesgo (promedio de ^IRX): 3.38%
+
+Retorno esperado de la cartera, E(Rp) = Σ peso × retorno esperado de cada activo
+  Por período:   0.4167%
+  Anual:           5.00%
 ```
 
 ## Cálculos
@@ -52,6 +56,7 @@ Con los precios de cierre (`src/metricas.py`):
 - **Volatilidad**: desvío estándar muestral de los retornos logarítmicos.
 - **Anualización**: retorno medio × períodos por año y volatilidad × √(períodos por año), con 252 días hábiles, 52 semanas o 12 meses según la frecuencia. Funciona igual para plazos menores o mayores a un año.
 - **Tasa libre de riesgo**: promedio de `^IRX` (rendimiento anual de la Letra del Tesoro de EE.UU. a 13 semanas) entre la fecha de inicio y la de fin. Se calcula sola, no se pregunta.
+- **Retorno esperado de la cartera**: `E(Rp) = Σ w_i · E(R_i)`, el promedio ponderado por los pesos de los retornos esperados (retorno logarítmico medio) de cada activo. Se muestra por período y anualizado.
 - **Sharpe ratio**: `(retorno anualizado − ln(1 + rf)) / volatilidad anualizada`. La tasa se pasa a logarítmica para restarla en la misma escala que el retorno.
 
 Los precios que devuelve yfinance están ajustados por dividendos y splits. Con frecuencia mensual, cada precio es el cierre del último día hábil del mes.

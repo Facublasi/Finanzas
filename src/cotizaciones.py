@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import yfinance as yf
 
-from metricas import resumen, retornos_log
+from metricas import resumen, retorno_esperado_cartera, retornos_log
 
 # Tasa libre de riesgo: rendimiento anual (en %) de la Letra del Tesoro de
 # EE.UU. a 13 semanas.
@@ -188,6 +188,11 @@ def main():
         mostrar_detalle(ticker, validos[ticker], resumenes[ticker], tasa_libre_riesgo)
     else:
         mostrar_comparativa(resumenes, cartera, tasa_libre_riesgo)
+
+    esperado = retorno_esperado_cartera(resumenes, cartera)
+    print("\nRetorno esperado de la cartera, E(Rp) = Σ peso × retorno esperado de cada activo")
+    print(f"  Por período:  {esperado['por_periodo']:8.4%}")
+    print(f"  Anual:        {esperado['anual']:8.2%}")
 
 
 if __name__ == "__main__":

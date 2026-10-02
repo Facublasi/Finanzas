@@ -51,3 +51,15 @@ def resumen(precios: pd.Series, intervalo: str, tasa_libre_riesgo: float) -> dic
         "tasa_libre_riesgo_log": tasa_log,
         "sharpe": (retorno_anual - tasa_log) / volatilidad_anual,
     }
+
+
+def retorno_esperado_cartera(resumenes: dict, cartera: dict) -> dict:
+    """Retorno esperado de la cartera: promedio ponderado de los retornos
+    esperados de cada activo, E(Rp) = Σ w_i · E(R_i).
+
+    `resumenes` es {ticker: resumen(...)} y `cartera` es {ticker: peso decimal}.
+    """
+    return {
+        "por_periodo": sum(cartera[t] * r["retorno_log_medio"] for t, r in resumenes.items()),
+        "anual": sum(cartera[t] * r["retorno_log_anual"] for t, r in resumenes.items()),
+    }

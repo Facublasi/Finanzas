@@ -6,9 +6,11 @@ Trabajo práctico de finanzas (análisis de activos y carteras con yfinance). El
 
 - `src/cotizaciones.py`: programa principal (se corre con `python src/cotizaciones.py`). Pide los datos, descarga precios y muestra resultados.
 - `src/metricas.py`: solo las fórmulas (retornos, volatilidad, Sharpe, cartera).
+- `src/presentacion.py`: todo lo que se muestra. Las tablas de la pantalla y la presentación con la estética de Tu Asesoría Financiera (`reportes/reporte.html` y `reportes/reporte.pdf`).
+- `src/assets/`: logo, tipografías (Cinzel, EB Garamond, Lato) y `plantilla.html` (estilos de la presentación).
 - `README.md`: describe el uso y los cálculos; mantenerlo actualizado con cada cambio.
 
-Es un único programa en dos archivos. Mantener esa separación.
+Es un único programa en tres archivos: datos (`cotizaciones.py`), cálculos (`metricas.py`) y presentación (`presentacion.py`). Mantener esa separación.
 
 ## Qué hace hoy
 
@@ -18,6 +20,7 @@ Es un único programa en dos archivos. Mantener esa separación.
 4. Tasa libre de riesgo: promedio de `^IRX` entre las fechas. **No se pregunta.**
 5. Por activo: retorno logarítmico, retorno anualizado, volatilidad anualizada y Sharpe.
 6. Cartera: retorno esperado `Σ w·E(R)`, volatilidad `√(wᵀΣw)`, Sharpe, matrices de covarianzas y correlaciones.
+7. Guarda una presentación tipo diapositivas (16:9) en HTML y PDF con la marca Tu Asesoría Financiera: paleta azul marino, dorado y crema; logo y datos de contacto. El PDF se genera con Playwright (Chromium); si no está, queda solo el HTML.
 
 ## Decisiones tomadas (no cambiar sin que el usuario lo pida)
 

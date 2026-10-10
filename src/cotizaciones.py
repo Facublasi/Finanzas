@@ -1,15 +1,19 @@
 """Descarga cotizaciones usando yfinance, pidiendo los datos por teclado."""
 
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
-import pandas as pd
 import yfinance as yf
 
-from metricas import resumen, resumen_cartera, retornos_log
+from metricas import resumen, resumen_cartera
+from presentacion import generar_reporte, mostrar_cartera, mostrar_comparativa, mostrar_detalle
 
 # Tasa libre de riesgo: rendimiento anual (en %) de la Letra del Tesoro de
 # EE.UU. a 13 semanas.
 TICKER_TASA = "^IRX"
+
+# Carpeta donde se guarda la presentación (HTML y PDF).
+CARPETA_REPORTES = Path(__file__).parent.parent / "reportes"
 
 FRECUENCIAS = {
     "1": ("1d", "Diaria"),
@@ -116,63 +120,6 @@ def descargar_validos(tickers: list, inicio: date, fin: date, intervalo: str) ->
     return validos
 
 
-def mostrar_detalle(ticker: str, datos, r: dict, tasa_libre_riesgo: float):
-    """Tabla de precios y resumen de métricas de un único activo."""
-    datos["Ret. log"] = retornos_log(datos["Close"])
-    print(datos[["Open", "High", "Low", "Close", "Volume", "Ret. log"]])
-    print(f"\nResumen de {ticker} ({r['observaciones']} retornos)")
-    print(f"  Retorno logarítmico total:  {r['retorno_log_total']:8.2%}")
-    print(f"  Retorno logarítmico medio:  {r['retorno_log_medio']:8.4%} por período")
-    print(f"  Retorno logarítmico anual:  {r['retorno_log_anual']:8.2%}")
-    print(f"  Volatilidad:                {r['volatilidad_periodo']:8.4%} por período")
-    print(f"  Volatilidad anualizada:     {r['volatilidad_anual']:8.2%}")
-    print(
-        f"  Tasa libre de riesgo:       {tasa_libre_riesgo:8.2%}"
-        f" (promedio de {TICKER_TASA}; log: {r['tasa_libre_riesgo_log']:.2%})"
-    )
-    print(f"  Sharpe ratio:               {r['sharpe']:8.2f}")
-
-
-def mostrar_comparativa(resumenes: dict, cartera: dict, tasa_libre_riesgo: float):
-    """Tabla con una fila por activo, ordenada de mayor a menor Sharpe."""
-    tabla = pd.DataFrame(
-        {
-            "Peso": cartera,
-            "Retornos": {t: r["observaciones"] for t, r in resumenes.items()},
-            "Ret. log total": {t: r["retorno_log_total"] for t, r in resumenes.items()},
-            "Ret. log anual": {t: r["retorno_log_anual"] for t, r in resumenes.items()},
-            "Volatilidad anual": {t: r["volatilidad_anual"] for t, r in resumenes.items()},
-            "Sharpe": {t: r["sharpe"] for t, r in resumenes.items()},
-        }
-    ).sort_values("Sharpe", ascending=False)
-    porcentaje = "{:.2%}".format
-    print(tabla.to_string(formatters={
-        "Peso": porcentaje,
-        "Ret. log total": porcentaje,
-        "Ret. log anual": porcentaje,
-        "Volatilidad anual": porcentaje,
-        "Sharpe": "{:.2f}".format,
-    }))
-    print(f"\nTasa libre de riesgo (promedio de {TICKER_TASA}): {tasa_libre_riesgo:.2%}")
-
-
-def mostrar_cartera(c: dict):
-    """Matrices de covarianzas y correlaciones, y métricas de la cartera."""
-    if len(c["covarianzas"]) > 1:
-        print("\nMatriz de covarianzas (por período)")
-        print(c["covarianzas"].to_string(float_format="{:.6f}".format))
-        print("\nMatriz de correlaciones")
-        print(c["correlaciones"].to_string(float_format="{:.4f}".format))
-    print(f"\nCartera ({c['observaciones']} retornos)")
-    print("  Retorno esperado, E(Rp) = Σ w_i · E(R_i)")
-    print(f"    Por período:  {c['retorno_periodo']:8.4%}")
-    print(f"    Anual:        {c['retorno_anual']:8.2%}")
-    print("  Volatilidad, σp = √(wᵀ · Σ · w)")
-    print(f"    Por período:  {c['volatilidad_periodo']:8.4%}")
-    print(f"    Anual:        {c['volatilidad_anual']:8.2%}")
-    print(f"  Sharpe ratio:   {c['sharpe']:8.2f}")
-
-
 def main():
     hoy = date.today()
     cartera = pedir_cartera()
@@ -202,12 +149,15 @@ def main():
     print(f"\n{', '.join(validos)} | {inicio:%d-%m-%Y} a {fin:%d-%m-%Y} | intervalo {intervalo}\n")
     if len(validos) == 1:
         ticker = next(iter(validos))
-        mostrar_detalle(ticker, validos[ticker], resumenes[ticker], tasa_libre_riesgo)
+        mostrar_detalle(ticker, validos[ticker], resumenes[ticker], tasa_libre_riesgo, TICKER_TASA)
     else:
-        mostrar_comparativa(resumenes, cartera, tasa_libre_riesgo)
+        mostrar_comparativa(resumenes, cartera, tasa_libre_riesgo, TICKER_TASA)
 
     precios = {ticker: datos["Close"] for ticker, datos in validos.items()}
-    mostrar_cartera(resumen_cartera(precios, cartera, intervalo, tasa_libre_riesgo))
+    datos_cartera = resumen_cartera(precios, cartera, intervalo, tasa_libre_riesgo)
+    mostrar_cartera(datos_cartera)
+    generar_reporte(CARPETA_REPORTES, cartera, inicio, fin, intervalo, tasa_libre_riesgo, TICKER_TASA,
+                    resumenes, datos_cartera, precios)
 
 
 if __name__ == "__main__":

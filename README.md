@@ -6,7 +6,10 @@ Trabajo práctico de análisis financiero con [yfinance](https://github.com/rana
 
 ```bash
 pip install -r requirements.txt
+playwright install chromium
 ```
+
+El segundo comando descarga el navegador que se usa para generar el PDF. Si no se instala, el programa igual funciona y guarda la presentación en HTML.
 
 ## Uso
 
@@ -65,6 +68,25 @@ Cartera (59 retornos)
     Anual:          22.51%
   Sharpe ratio:       0.07
 ```
+
+## Presentación
+
+Además de mostrar los resultados en pantalla, el programa guarda una presentación con la estética de Tu Asesoría Financiera en la carpeta `reportes/`:
+
+- `reportes/reporte.html`: se abre con cualquier navegador.
+- `reportes/reporte.pdf`: el mismo contenido en PDF, una diapositiva por página.
+
+Cada vez que se corre el programa, los dos archivos se reemplazan. Las diapositivas son:
+
+1. **Portada**: activos, período, frecuencia y fecha de emisión.
+2. **La cartera**: gráfico de pesos, retorno esperado, volatilidad, Sharpe y tasa libre de riesgo.
+3. **Métricas por activo**: la misma tabla comparativa de la pantalla, con la fila de la cartera.
+4. **Evolución de precios**: gráfico de cada activo con los precios llevados a 100 al inicio del período.
+5. **Riesgo, retorno y Sharpe**: gráfico de volatilidad contra retorno y barras con el Sharpe de cada activo y de la cartera.
+6. **Correlaciones**: mapa de calor con la mitad de abajo de la matriz (es simétrica y la diagonal siempre vale 1). Usa su propia escala de colores: rojo para −1, amarillo para 0 y verde para 1. La matriz de covarianzas se muestra solo en pantalla.
+7. **Metodología**: cómo se calcula cada métrica, y los datos de contacto.
+
+Con un solo activo no se incluyen las diapositivas 5 y 6. Los valores son los mismos que se muestran en pantalla, con el mismo redondeo.
 
 ## Cálculos
 

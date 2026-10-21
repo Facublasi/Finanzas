@@ -120,12 +120,14 @@ def objetivos_publicados(historial: pd.DataFrame, splits: pd.Series) -> pd.DataF
     return tabla.drop(columns="trimestre").reset_index(drop=True)
 
 
-def precision_objetivos(precios: pd.Series, objetivos: pd.DataFrame, hoy, meses: int = 12) -> pd.DataFrame:
+def precision_objetivos(
+    precios: pd.Series, objetivos: pd.DataFrame, hoy, anios: int, meses: int = 12
+) -> pd.DataFrame:
     """Compara cada precio objetivo publicado con lo que pasó `meses` después.
 
     `precios` son los cierres diarios y `objetivos` sale de
-    `objetivos_publicados`. Solo se evalúan los objetivos que ya cumplieron
-    `meses` de antigüedad y que tienen precios desde su publicación.
+    `objetivos_publicados`. Se evalúan los objetivos publicados en los
+    últimos `anios` años que ya cumplieron `meses` de antigüedad.
 
     Un objetivo por encima del precio del día espera una suba: se cumple si el
     precio final está en el objetivo o por encima. Uno por debajo espera una
@@ -133,12 +135,13 @@ def precision_objetivos(precios: pd.Series, objetivos: pd.DataFrame, hoy, meses:
     """
     precios = pd.Series(precios.values, index=_solo_fecha(precios.index)).dropna()
     limite = min(pd.Timestamp(hoy), precios.index.max())
+    desde = max(pd.Timestamp(hoy) - pd.DateOffset(years=anios), precios.index.min())
 
     filas = []
     for _, fila in objetivos.iterrows():
         fecha, objetivo = fila["fecha"], fila["objetivo"]
         fin = fecha + pd.DateOffset(months=meses)
-        if fin > limite or fecha < precios.index.min():
+        if fin > limite or fecha < desde:
             continue
         inicial = precios[precios.index >= fecha].iloc[0]
         tramo = precios[(precios.index > fecha) & (precios.index <= fin)]

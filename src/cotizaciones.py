@@ -232,7 +232,7 @@ def _analizar_activo(ticker: str, hoy: date) -> dict:
         detalle, precision, tendencia, historia = pd.DataFrame(), {"evaluados": None}, None, None
     else:
         objetivos = objetivos_publicados(datos["historial"], datos["splits"])
-        detalle = precision_objetivos(datos["precios"], objetivos, hoy)
+        detalle = precision_objetivos(datos["precios"], objetivos, hoy, ANIOS_ANALISTAS)
         precision = resumen_precision(detalle)
         tendencia = tendencia_objetivos(objetivos, hoy)
         historia = consenso_contra_realidad(objetivos, datos["precios"], hoy, ANIOS_ANALISTAS)

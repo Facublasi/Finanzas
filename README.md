@@ -74,7 +74,7 @@ Cartera (59 retornos)
 
 Si respondés `s` a la última pregunta, el programa descarga de Yahoo Finance los precios objetivo de los analistas y muestra una tabla con:
 
-- **Objetivo y Rango**: mediana actual de los precios objetivo y el mínimo y máximo. **Suba esperada**: cuánto tendría que subir la acción desde el precio de hoy para llegar a la mediana.
+- **Objetivo y Rango**: promedio actual de los precios objetivo (el "1y Target Est" que muestra Yahoo Finance) y el mínimo y máximo. **Suba esperada**: cuánto tendría que subir la acción desde el precio de hoy para llegar al promedio.
 - **Precisión de los objetivos pasados** (solo acciones): toma los objetivos publicados entre hace 36 y hace 12 meses y los compara con el precio de cierre 12 meses después.
   - **Evaluados**: cantidad de objetivos comparados.
   - **Cumplidos**: porcentaje en el que el precio final alcanzó el objetivo (o bajó hasta él, si el objetivo esperaba una baja).

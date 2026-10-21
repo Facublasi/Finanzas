@@ -180,7 +180,7 @@ def objetivo_implicito(tenencias: list, precio_etf: float) -> dict:
     """Precio objetivo implícito de un ETF a partir de sus principales tenencias.
 
     `tenencias` es una lista de {peso, precio, objetivo}, con el objetivo
-    mediano de los analistas de cada tenencia. La suba esperada del
+    promedio de los analistas de cada tenencia. La suba esperada del
     ETF es el promedio de la suba esperada de cada tenencia, ponderado por su
     peso, contando solo las que tienen precio objetivo. `cobertura` es la
     parte del ETF que representan esas tenencias.

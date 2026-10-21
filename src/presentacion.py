@@ -147,7 +147,7 @@ def mostrar_analistas(analistas: dict):
         "Precio": numero, "Objetivo": numero, "Suba esperada": _pct, "Evaluados": entero,
         "Cumplidos": simple, "Tocados": simple, "Suba prometida": _pct, "Suba real": _pct,
     }))
-    print(f"\n  Objetivo: mediana actual de los analistas; Rango: objetivo mínimo y máximo"
+    print(f"\n  Objetivo: promedio actual de los analistas; Rango: objetivo mínimo y máximo"
           " (en los ETF, implícito por sus 10 principales tenencias).")
     print(f"  Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses,"
           " comparados con el precio 12 meses después.")
@@ -384,7 +384,7 @@ def _analistas_html(analistas: dict) -> str:
   <tbody>{filas}</tbody>
 </table>"""
     contenido += f"""
-<div class="note">Objetivo: mediana actual de los analistas; Rango: objetivo mínimo y máximo. En los ETF, el objetivo es implícito a partir de sus 10 principales tenencias.
+<div class="note">Objetivo: promedio actual de los analistas, el mismo que muestra Yahoo Finance; Rango: objetivo mínimo y máximo. En los ETF, el objetivo es implícito a partir de sus 10 principales tenencias.
 Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses, comparados con el precio de cierre 12 meses después.
 Cumplidos: el precio final alcanzó el objetivo. Tocados: lo alcanzó en algún momento de esos 12 meses.</div>"""
     return contenido

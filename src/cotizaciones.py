@@ -8,8 +8,8 @@ import pandas as pd
 import yfinance as yf
 
 from metricas import (
-    objetivo_implicito, precision_objetivos, precision_por_banco, resumen, resumen_cartera,
-    resumen_precision,
+    objetivo_implicito, objetivos_publicados, precision_objetivos, precision_por_banco, resumen,
+    resumen_cartera, resumen_precision, tendencia_objetivos,
 )
 from presentacion import (
     generar_reporte, mostrar_analistas, mostrar_cartera, mostrar_comparativa, mostrar_detalle,
@@ -220,10 +220,12 @@ def _analizar_activo(ticker: str, hoy: date) -> dict:
     actual = datos["objetivo_actual"]
     if datos["historial"] is None:
         # Yahoo no devolvió el historial: no es lo mismo que 0 objetivos.
-        detalle, precision = pd.DataFrame(), {"evaluados": None}
+        detalle, precision, tendencia = pd.DataFrame(), {"evaluados": None}, None
     else:
-        detalle = precision_objetivos(datos["precios"], datos["splits"], datos["historial"], hoy)
+        objetivos = objetivos_publicados(datos["historial"], datos["splits"])
+        detalle = precision_objetivos(datos["precios"], objetivos, hoy)
         precision = resumen_precision(detalle)
+        tendencia = tendencia_objetivos(objetivos, hoy)
     return {
         "tipo": "Acción",
         "precio": actual.get("current"),
@@ -232,6 +234,7 @@ def _analizar_activo(ticker: str, hoy: date) -> dict:
         "minimo": actual.get("low"),
         "maximo": actual.get("high"),
         "suba": actual["mean"] / actual["current"] - 1 if actual.get("mean") and actual.get("current") else None,
+        "tendencia": tendencia,
         "detalle": detalle,
         **precision,
     }

@@ -104,36 +104,46 @@ def _pct(valor, decimales: int = 1) -> str:
 
 
 def _tabla_analistas(analistas: dict) -> pd.DataFrame:
-    """Una fila por activo: objetivo actual y precisión de los objetivos pasados."""
+    """Una fila por activo: objetivo actual, tendencia y precisión de los
+    objetivos pasados. Los ETF se marcan en el nombre con la parte que cubren
+    sus principales tenencias."""
     filas = {}
     for ticker, r in analistas["activos"].items():
         if r["tipo"] == "ETF":
             cobertura = r.get("cobertura", 0)
-            filas[ticker] = {
-                "Tipo": f"ETF ({cobertura:.0%} cubierto)" if cobertura else "ETF (sin datos)",
-                "Precio": r["precio"],
-                "Objetivo": r.get("objetivo"),
-                "Rango": None,
-                "Suba esperada": r.get("suba"),
-                "Evaluados": None, "Cumplidos": None, "Tocados": None,
-                "Suba prometida": None, "Suba real": None,
-            }
+            nombre = f"{ticker} (ETF, {cobertura:.0%})" if cobertura else f"{ticker} (ETF)"
+            filas[nombre] = {"Precio": r["precio"], "Objetivo": r.get("objetivo"),
+                             "Suba esperada": r.get("suba")}
         elif r["tipo"] == "Acción":
             filas[ticker] = {
-                "Tipo": "Acción",
                 "Precio": r.get("precio"),
                 "Objetivo": r.get("objetivo"),
                 "Rango": f"{r['minimo']:.2f} a {r['maximo']:.2f}" if r.get("minimo") and r.get("maximo") else None,
                 "Suba esperada": r.get("suba"),
+                "Tendencia 3m": r.get("tendencia"),
                 "Evaluados": r.get("evaluados"),
                 "Cumplidos": r.get("cumplidos"),
                 "Tocados": r.get("tocados"),
                 "Suba prometida": r.get("suba_prometida"),
                 "Suba real": r.get("suba_real"),
+                "Error típico": r.get("error"),
             }
         else:
-            filas[ticker] = {"Tipo": "Sin datos"}
-    return pd.DataFrame.from_dict(filas, orient="index")
+            filas[ticker] = {}
+    columnas = ["Precio", "Objetivo", "Rango", "Suba esperada", "Tendencia 3m", "Evaluados",
+                "Cumplidos", "Tocados", "Suba prometida", "Suba real", "Error típico"]
+    return pd.DataFrame.from_dict(filas, orient="index").reindex(columns=columnas)
+
+
+_NOTA_ANALISTAS = (
+    "Objetivo: promedio actual de los analistas, el mismo que muestra Yahoo Finance; Rango: objetivo mínimo y "
+    "máximo. En los ETF, el objetivo es implícito a partir de sus 10 principales tenencias (entre paréntesis, "
+    "la parte del ETF que cubren). Tendencia 3m: cuánto cambió el consenso en los últimos 3 meses. "
+    "Evaluados: objetivos publicados entre hace {meses} y hace 12 meses (uno por banco por trimestre), "
+    "comparados con el precio de cierre 12 meses después. Cumplidos: el precio final alcanzó el objetivo. "
+    "Tocados: lo alcanzó en algún momento de esos 12 meses. Suba prometida, suba real y error típico "
+    "(real − prometida) son medianas."
+)
 
 
 def mostrar_analistas(analistas: dict):
@@ -144,22 +154,21 @@ def mostrar_analistas(analistas: dict):
     simple = lambda v: "—" if v is None or pd.isna(v) else f"{v:.0%}"
     print("\nProyecciones de analistas")
     print(tabla.to_string(na_rep="—", formatters={
-        "Precio": numero, "Objetivo": numero, "Suba esperada": _pct, "Evaluados": entero,
-        "Cumplidos": simple, "Tocados": simple, "Suba prometida": _pct, "Suba real": _pct,
+        "Precio": numero, "Objetivo": numero, "Suba esperada": _pct, "Tendencia 3m": _pct,
+        "Evaluados": entero, "Cumplidos": simple, "Tocados": simple, "Suba prometida": _pct,
+        "Suba real": _pct, "Error típico": _pct,
     }))
-    print(f"\n  Objetivo: promedio actual de los analistas; Rango: objetivo mínimo y máximo"
-          " (en los ETF, implícito por sus 10 principales tenencias).")
-    print(f"  Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses,"
-          " comparados con el precio 12 meses después.")
+    print("\n  " + _NOTA_ANALISTAS.format(meses=analistas["anios"] * 12))
     for ticker, r in analistas["activos"].items():
         if r["tipo"] == "Sin datos" or (r["tipo"] == "Acción" and r.get("evaluados") is None):
             print(f"  Aviso: Yahoo no devolvió los datos de analistas de {ticker}. Probá de nuevo en unos minutos.")
     bancos = analistas["bancos"]
     if not bancos.empty:
         print("\nPrecisión por banco (al menos 3 objetivos evaluados)")
-        print(bancos.rename_axis(None).to_string(header=["Evaluados", "Cumplidos", "Suba prometida", "Suba real"], formatters={
-            "cumplidos": simple, "suba_prometida": _pct, "suba_real": _pct,
-        }))
+        print(bancos.rename_axis(None).to_string(
+            header=["Evaluados", "Cumplidos", "Suba prometida", "Suba real", "Error típico"],
+            formatters={"cumplidos": simple, "suba_prometida": _pct, "suba_real": _pct, "error": _pct},
+        ))
 
 
 # ---------------------------------------------------------------------------
@@ -351,42 +360,42 @@ def _analistas_html(analistas: dict) -> str:
             return '<td class="r">—</td>'
         clase = ' class="r neg"' if formato is _pct and valor < 0 else ' class="r"'
         return f"<td{clase}>{formato(valor)}</td>"
-    numero = lambda v: f"{v:.2f}"
-    entero = lambda v: f"{int(v)}"
-    simple = lambda v: f"{v:.0%}"
+    formatos = {
+        "Precio": lambda v: f"{v:.2f}", "Objetivo": lambda v: f"{v:.2f}", "Rango": str,
+        "Suba esperada": _pct, "Tendencia 3m": _pct, "Evaluados": lambda v: f"{int(v)}",
+        "Cumplidos": lambda v: f"{v:.0%}", "Tocados": lambda v: f"{v:.0%}",
+        "Suba prometida": _pct, "Suba real": _pct, "Error típico": _pct,
+    }
 
     tabla = _tabla_analistas(analistas)
+    cabecera = "".join(f'<th class="r">{c}</th>' for c in tabla.columns)
     filas = "".join(
-        f'<tr><td class="tk">{html.escape(t)}</td><td>{html.escape(str(f.get("Tipo", "")))}</td>'
-        + celda(f.get("Precio"), numero) + celda(f.get("Objetivo"), numero) + celda(f.get("Rango"), str)
-        + celda(f.get("Suba esperada"), _pct)
-        + celda(f.get("Evaluados"), entero) + celda(f.get("Cumplidos"), simple) + celda(f.get("Tocados"), simple)
-        + celda(f.get("Suba prometida"), _pct) + celda(f.get("Suba real"), _pct) + "</tr>"
+        f'<tr><td class="tk">{html.escape(t)}</td>'
+        + "".join(celda(f[c], formatos[c]) for c in tabla.columns) + "</tr>"
         for t, f in tabla.iterrows()
     )
     contenido = f"""
 <table class="compacta">
-  <thead><tr><th>Activo</th><th>Tipo</th><th class="r">Precio</th><th class="r">Objetivo</th><th class="r">Rango</th><th class="r">Suba esperada</th>
-  <th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Tocados</th><th class="r">Suba prometida</th><th class="r">Suba real</th></tr></thead>
+  <thead><tr><th>Activo</th>{cabecera}</tr></thead>
   <tbody>{filas}</tbody>
 </table>"""
     bancos = analistas["bancos"].head(5)
     if not bancos.empty:
         filas = "".join(
-            f'<tr><td class="tk">{html.escape(banco)}</td>' + celda(f["evaluados"], entero) + celda(f["cumplidos"], simple)
-            + celda(f["suba_prometida"], _pct) + celda(f["suba_real"], _pct) + "</tr>"
+            f'<tr><td class="tk">{html.escape(banco)}</td>' + celda(f["evaluados"], formatos["Evaluados"])
+            + celda(f["cumplidos"], formatos["Cumplidos"]) + celda(f["suba_prometida"], _pct)
+            + celda(f["suba_real"], _pct) + celda(f["error"], _pct) + "</tr>"
             for banco, f in bancos.iterrows()
         )
         contenido += f"""
 <div class="sec"><span class="bar"></span><h2>Precisión por banco</h2></div>
 <table class="compacta">
-  <thead><tr><th>Banco</th><th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Suba prometida</th><th class="r">Suba real</th></tr></thead>
+  <thead><tr><th>Banco</th><th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Suba prometida</th>
+  <th class="r">Suba real</th><th class="r">Error típico</th></tr></thead>
   <tbody>{filas}</tbody>
 </table>"""
-    contenido += f"""
-<div class="note">Objetivo: promedio actual de los analistas, el mismo que muestra Yahoo Finance; Rango: objetivo mínimo y máximo. En los ETF, el objetivo es implícito a partir de sus 10 principales tenencias.
-Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses, comparados con el precio de cierre 12 meses después.
-Cumplidos: el precio final alcanzó el objetivo. Tocados: lo alcanzó en algún momento de esos 12 meses.</div>"""
+    contenido += f'''
+<div class="note">{html.escape(_NOTA_ANALISTAS.format(meses=analistas["anios"] * 12))}</div>'''
     return contenido
 
 

@@ -97,49 +97,63 @@ def _solo_fecha(indice: pd.Index) -> pd.DatetimeIndex:
     return indice.normalize()
 
 
-def precision_objetivos(
-    precios: pd.Series, splits: pd.Series, historial: pd.DataFrame, hoy, meses: int = 12
-) -> pd.DataFrame:
+def objetivos_publicados(historial: pd.DataFrame, splits: pd.Series) -> pd.DataFrame:
+    """Precios objetivo publicados, en la escala de los precios actuales.
+
+    Descarta los registros sin objetivo (cambios de recomendación sin precio)
+    y deja uno por banco por trimestre, el último: así un banco que confirma
+    su objetivo varias veces no pesa más que otro. Los objetivos no están
+    corregidos por splits y los precios sí, por eso un objetivo publicado
+    antes de un split se divide por su proporción.
+    """
+    splits = pd.Series(splits.values, index=_solo_fecha(splits.index))
+    tabla = pd.DataFrame({
+        "fecha": _solo_fecha(historial.index),
+        "banco": historial["Firm"].values,
+        "objetivo": historial["currentPriceTarget"].values,
+    })
+    tabla = tabla[tabla["objetivo"] > 0].sort_values("fecha")
+    tabla["trimestre"] = tabla["fecha"].dt.to_period("Q")
+    tabla = tabla.groupby(["banco", "trimestre"]).tail(1)
+    for fecha_split, proporcion in splits.items():
+        tabla.loc[tabla["fecha"] < fecha_split, "objetivo"] /= proporcion
+    return tabla.drop(columns="trimestre").reset_index(drop=True)
+
+
+def precision_objetivos(precios: pd.Series, objetivos: pd.DataFrame, hoy, meses: int = 12) -> pd.DataFrame:
     """Compara cada precio objetivo publicado con lo que pasó `meses` después.
 
-    `precios` son los cierres diarios (Yahoo los corrige por splits),
-    `splits` es {fecha: proporción} y `historial` tiene una fila por precio
-    objetivo publicado (columnas Firm y currentPriceTarget). Solo se evalúan
-    los objetivos que ya cumplieron `meses` de antigüedad.
+    `precios` son los cierres diarios y `objetivos` sale de
+    `objetivos_publicados`. Solo se evalúan los objetivos que ya cumplieron
+    `meses` de antigüedad y que tienen precios desde su publicación.
 
     Un objetivo por encima del precio del día espera una suba: se cumple si el
     precio final está en el objetivo o por encima. Uno por debajo espera una
     baja: se cumple si el precio final está en el objetivo o por debajo.
     """
     precios = pd.Series(precios.values, index=_solo_fecha(precios.index)).dropna()
-    splits = pd.Series(splits.values, index=_solo_fecha(splits.index))
-    historial = historial.copy()
-    historial.index = _solo_fecha(historial.index)
     limite = min(pd.Timestamp(hoy), precios.index.max())
 
     filas = []
-    for fecha, fila in historial.sort_index().iterrows():
-        objetivo = fila["currentPriceTarget"]
+    for _, fila in objetivos.iterrows():
+        fecha, objetivo = fila["fecha"], fila["objetivo"]
         fin = fecha + pd.DateOffset(months=meses)
-        if not objetivo > 0 or fin > limite or fecha < precios.index.min():
+        if fin > limite or fecha < precios.index.min():
             continue
-        # Los objetivos no están corregidos por splits y los precios sí: un
-        # objetivo publicado antes de un split se divide por su proporción.
-        for fecha_split, proporcion in splits.items():
-            if fecha_split > fecha:
-                objetivo /= proporcion
         inicial = precios[precios.index >= fecha].iloc[0]
         tramo = precios[(precios.index > fecha) & (precios.index <= fin)]
         final = tramo.iloc[-1]
         alcista = objetivo >= inicial
         filas.append({
             "fecha": fecha,
-            "banco": fila["Firm"],
+            "banco": fila["banco"],
             "objetivo": objetivo,
             "precio_inicial": inicial,
             "precio_final": final,
             "suba_prometida": objetivo / inicial - 1,
             "suba_real": final / inicial - 1,
+            # Error: cuánto se equivocó el objetivo (positivo = la acción subió más de lo prometido).
+            "error": final / inicial - objetivo / inicial,
             "cumplido": final >= objetivo if alcista else final <= objetivo,
             "tocado": tramo.max() >= objetivo if alcista else tramo.min() <= objetivo,
         })
@@ -147,15 +161,18 @@ def precision_objetivos(
 
 
 def resumen_precision(detalle: pd.DataFrame) -> dict:
-    """Porcentaje de objetivos cumplidos y suba prometida contra suba real."""
+    """Porcentaje de objetivos cumplidos y tocados, y medianas de la suba
+    prometida, la suba real y el error. Se usa la mediana para que unas pocas
+    subas extremas no distorsionen el resultado."""
     if detalle.empty:
         return {"evaluados": 0}
     return {
         "evaluados": len(detalle),
         "cumplidos": detalle["cumplido"].mean(),
         "tocados": detalle["tocado"].mean(),
-        "suba_prometida": detalle["suba_prometida"].mean(),
-        "suba_real": detalle["suba_real"].mean(),
+        "suba_prometida": detalle["suba_prometida"].median(),
+        "suba_real": detalle["suba_real"].median(),
+        "error": detalle["error"].median(),
     }
 
 
@@ -170,10 +187,32 @@ def precision_por_banco(detalles: list, minimo: int = 3) -> pd.DataFrame:
     tabla = todos.groupby("banco").agg(
         evaluados=("cumplido", "size"),
         cumplidos=("cumplido", "mean"),
-        suba_prometida=("suba_prometida", "mean"),
-        suba_real=("suba_real", "mean"),
+        suba_prometida=("suba_prometida", "median"),
+        suba_real=("suba_real", "median"),
+        error=("error", "median"),
     )
     return tabla[tabla["evaluados"] >= minimo].sort_values("evaluados", ascending=False)
+
+
+def tendencia_objetivos(objetivos: pd.DataFrame, hoy, meses: int = 3, vigencia: int = 12):
+    """Variación del consenso de los analistas en los últimos `meses`.
+
+    El consenso a una fecha es el promedio del último objetivo de cada banco
+    publicado en los `vigencia` meses anteriores (un objetivo más viejo se
+    considera vencido). Devuelve None si falta el consenso de alguna fecha.
+    """
+    def consenso(fecha):
+        vigentes = objetivos[(objetivos["fecha"] <= fecha)
+                             & (objetivos["fecha"] > fecha - pd.DateOffset(months=vigencia))]
+        if vigentes.empty:
+            return None
+        return vigentes.groupby("banco").tail(1)["objetivo"].mean()
+
+    hoy = pd.Timestamp(hoy)
+    actual, anterior = consenso(hoy), consenso(hoy - pd.DateOffset(months=meses))
+    if actual is None or anterior is None:
+        return None
+    return actual / anterior - 1
 
 
 def objetivo_implicito(tenencias: list, precio_etf: float) -> dict:

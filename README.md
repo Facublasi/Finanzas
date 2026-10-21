@@ -75,11 +75,13 @@ Cartera (59 retornos)
 Si respondés `s` a la última pregunta, el programa descarga de Yahoo Finance los precios objetivo de los analistas y muestra una tabla con:
 
 - **Objetivo y Rango**: promedio actual de los precios objetivo (el "1y Target Est" que muestra Yahoo Finance) y el mínimo y máximo. **Suba esperada**: cuánto tendría que subir la acción desde el precio de hoy para llegar al promedio.
-- **Precisión de los objetivos pasados** (solo acciones): toma los objetivos publicados entre hace 36 y hace 12 meses y los compara con el precio de cierre 12 meses después.
+- **Tendencia 3m**: cuánto cambió el consenso en los últimos 3 meses. El consenso a una fecha es el promedio del último objetivo de cada banco publicado en los 12 meses anteriores. Por eso puede no coincidir exactamente con el promedio de Yahoo.
+- **Precisión de los objetivos pasados** (solo acciones): toma los objetivos publicados entre hace 36 y hace 12 meses y los compara con el precio de cierre 12 meses después. Si un banco publicó varias veces en el mismo trimestre, se usa solo el último, para que los bancos que confirman su objetivo seguido no pesen más.
   - **Evaluados**: cantidad de objetivos comparados.
   - **Cumplidos**: porcentaje en el que el precio final alcanzó el objetivo (o bajó hasta él, si el objetivo esperaba una baja).
   - **Tocados**: porcentaje en el que el precio lo alcanzó en algún momento de esos 12 meses.
-  - **Suba prometida**: promedio de cuánto prometía subir cada objetivo desde el precio del día en que se publicó. **Suba real**: promedio de cuánto subió de verdad en los 12 meses siguientes.
+  - **Suba prometida**: mediana de cuánto prometía subir cada objetivo desde el precio del día en que se publicó. **Suba real**: mediana de cuánto subió de verdad en los 12 meses siguientes.
+  - **Error típico**: mediana de suba real − suba prometida de cada objetivo. Positivo: la acción subió más de lo prometido; negativo, menos. Se usan medianas para que unas pocas subas extremas no distorsionen el resultado.
 - **Precisión por banco**: lo mismo, por banco, sumando todas las acciones (solo bancos con al menos 3 objetivos evaluados).
 
 Los precios objetivo publicados antes de un split se corrigen por su proporción, para compararlos con los precios en la misma escala.

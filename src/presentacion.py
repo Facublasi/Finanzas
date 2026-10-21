@@ -98,6 +98,67 @@ def mostrar_cartera(c: dict):
     print(f"  Sharpe ratio:   {c['sharpe']:8.2f}")
 
 
+def _pct(valor, decimales: int = 1) -> str:
+    """Porcentaje con signo, o un guion si no hay dato."""
+    return "—" if valor is None or pd.isna(valor) else f"{valor:+.{decimales}%}"
+
+
+def _tabla_analistas(analistas: dict) -> pd.DataFrame:
+    """Una fila por activo: objetivo actual y precisión de los objetivos pasados."""
+    filas = {}
+    for ticker, r in analistas["activos"].items():
+        if r["tipo"] == "ETF":
+            cobertura = r.get("cobertura", 0)
+            filas[ticker] = {
+                "Tipo": f"ETF ({cobertura:.0%} cubierto)" if cobertura else "ETF (sin datos)",
+                "Precio": r["precio"],
+                "Objetivo": r.get("objetivo"),
+                "Suba esperada": r.get("suba"),
+                "Evaluados": None, "Cumplidos": None, "Tocados": None,
+                "Suba prometida": None, "Suba real": None,
+            }
+        elif r["tipo"] == "Acción":
+            filas[ticker] = {
+                "Tipo": "Acción",
+                "Precio": r.get("precio"),
+                "Objetivo": r.get("objetivo"),
+                "Suba esperada": r.get("suba"),
+                "Evaluados": r.get("evaluados", 0),
+                "Cumplidos": r.get("cumplidos"),
+                "Tocados": r.get("tocados"),
+                "Suba prometida": r.get("suba_prometida"),
+                "Suba real": r.get("suba_real"),
+            }
+        else:
+            filas[ticker] = {"Tipo": "Sin datos"}
+    return pd.DataFrame.from_dict(filas, orient="index")
+
+
+def mostrar_analistas(analistas: dict):
+    """Objetivo actual de cada activo, precisión histórica y precisión por banco."""
+    tabla = _tabla_analistas(analistas)
+    numero = lambda v: "—" if v is None or pd.isna(v) else f"{v:.2f}"
+    entero = lambda v: "—" if v is None or pd.isna(v) else f"{int(v)}"
+    simple = lambda v: "—" if v is None or pd.isna(v) else f"{v:.0%}"
+    print("\nProyecciones de analistas")
+    print(tabla.to_string(na_rep="—", formatters={
+        "Precio": numero, "Objetivo": numero, "Suba esperada": _pct, "Evaluados": entero,
+        "Cumplidos": simple, "Tocados": simple, "Suba prometida": _pct, "Suba real": _pct,
+    }))
+    print(f"\n  Objetivo: promedio actual de los analistas (en los ETF, implícito por sus 10 principales tenencias).")
+    print(f"  Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses,"
+          " comparados con el precio 12 meses después.")
+    for ticker, r in analistas["activos"].items():
+        if r["tipo"] == "Sin datos" or (r["tipo"] == "Acción" and r.get("evaluados") is None):
+            print(f"  Aviso: Yahoo no devolvió los datos de analistas de {ticker}. Probá de nuevo en unos minutos.")
+    bancos = analistas["bancos"]
+    if not bancos.empty:
+        print("\nPrecisión por banco (al menos 3 objetivos evaluados)")
+        print(bancos.rename_axis(None).to_string(header=["Evaluados", "Cumplidos", "Suba prometida", "Suba real"], formatters={
+            "cumplidos": simple, "suba_prometida": _pct, "suba_real": _pct,
+        }))
+
+
 # ---------------------------------------------------------------------------
 # Gráficos (imágenes PNG con la paleta y la tipografía de la marca)
 # ---------------------------------------------------------------------------
@@ -280,15 +341,60 @@ def _signo(valor: float) -> str:
     return ' class="r neg"' if valor < 0 else ' class="r"'
 
 
+def _analistas_html(analistas: dict) -> str:
+    """Tabla de proyecciones por activo y, si hay, la precisión por banco."""
+    def celda(valor, formato):
+        if valor is None or pd.isna(valor):
+            return '<td class="r">—</td>'
+        clase = ' class="r neg"' if formato is _pct and valor < 0 else ' class="r"'
+        return f"<td{clase}>{formato(valor)}</td>"
+    numero = lambda v: f"{v:.2f}"
+    entero = lambda v: f"{int(v)}"
+    simple = lambda v: f"{v:.0%}"
+
+    tabla = _tabla_analistas(analistas)
+    filas = "".join(
+        f'<tr><td class="tk">{html.escape(t)}</td><td>{html.escape(str(f.get("Tipo", "")))}</td>'
+        + celda(f.get("Precio"), numero) + celda(f.get("Objetivo"), numero) + celda(f.get("Suba esperada"), _pct)
+        + celda(f.get("Evaluados"), entero) + celda(f.get("Cumplidos"), simple) + celda(f.get("Tocados"), simple)
+        + celda(f.get("Suba prometida"), _pct) + celda(f.get("Suba real"), _pct) + "</tr>"
+        for t, f in tabla.iterrows()
+    )
+    contenido = f"""
+<table class="compacta">
+  <thead><tr><th>Activo</th><th>Tipo</th><th class="r">Precio</th><th class="r">Objetivo</th><th class="r">Suba esperada</th>
+  <th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Tocados</th><th class="r">Suba prometida</th><th class="r">Suba real</th></tr></thead>
+  <tbody>{filas}</tbody>
+</table>"""
+    bancos = analistas["bancos"].head(5)
+    if not bancos.empty:
+        filas = "".join(
+            f'<tr><td class="tk">{html.escape(banco)}</td>' + celda(f["evaluados"], entero) + celda(f["cumplidos"], simple)
+            + celda(f["suba_prometida"], _pct) + celda(f["suba_real"], _pct) + "</tr>"
+            for banco, f in bancos.iterrows()
+        )
+        contenido += f"""
+<div class="sec"><span class="bar"></span><h2>Precisión por banco</h2></div>
+<table class="compacta">
+  <thead><tr><th>Banco</th><th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Suba prometida</th><th class="r">Suba real</th></tr></thead>
+  <tbody>{filas}</tbody>
+</table>"""
+    contenido += f"""
+<div class="note">Objetivo: promedio actual de los analistas; en los ETF, implícito a partir de sus 10 principales tenencias.
+Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses, comparados con el precio de cierre 12 meses después.
+Cumplidos: el precio final alcanzó el objetivo. Tocados: lo alcanzó en algún momento de esos 12 meses.</div>"""
+    return contenido
+
+
 def armar_html(cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa,
-               resumenes, c, precios) -> str:
+               resumenes, c, precios, analistas=None) -> str:
     """Arma la presentación completa como un único archivo HTML."""
     _preparar_matplotlib()
     tickers = [html.escape(t) for t in cartera]
     periodo = f"{inicio:%d-%m-%Y} al {fin:%d-%m-%Y}"
     frecuencia = NOMBRES_FRECUENCIA[intervalo]
     varios = len(cartera) > 1
-    total = 7 if varios else 5
+    total = (7 if varios else 5) + (1 if analistas else 0)
 
     # 1. Portada
     portada = f"""
@@ -370,6 +476,12 @@ Para la cartera no se calcula un retorno total.</div>"""
 
     # Última: metodología y contacto
     nota_mensual = " Cada precio es el cierre del último día hábil del mes." if intervalo == "1mo" else ""
+    nota_analistas = (
+        '\n  <p><span class="first">Analistas.</span> Precios objetivo publicados en Yahoo Finance. Los objetivos '
+        "anteriores a un split se corrigen por su proporción. En los ETF, el objetivo implícito es el promedio "
+        "de la suba esperada de sus principales tenencias, ponderado por su peso.</p>"
+        if analistas else ""
+    )
     metodo_html = f"""
 <div class="pres method">
   <p><span class="first">Datos.</span> Precios de cierre ajustados por dividendos y splits, descargados de Yahoo Finance (yfinance).{nota_mensual}</p>
@@ -378,7 +490,7 @@ Para la cartera no se calcula un retorno total.</div>"""
   <p><span class="first">Covarianzas y correlaciones.</span> La volatilidad de la cartera usa la matriz de covarianzas muestral: σ<sub>p</sub> = √(wᵀ · Σ · w). La correlación es la covarianza dividida por los desvíos de los dos activos, y va de −1 a 1.</p>
   <p><span class="first">Anualización.</span> Retorno medio × períodos por año y volatilidad × √(períodos por año), con 252 días hábiles, 52 semanas o 12 meses según la frecuencia.</p>
   <p><span class="first">Tasa libre de riesgo.</span> Promedio de {html.escape(ticker_tasa)} (Letra del Tesoro de EE.UU. a 13 semanas) entre la fecha de inicio y la de fin.</p>
-  <p><span class="first">Sharpe ratio.</span> (Retorno anualizado − ln(1 + r<sub>f</sub>)) / volatilidad anualizada.</p>
+  <p><span class="first">Sharpe ratio.</span> (Retorno anualizado − ln(1 + r<sub>f</sub>)) / volatilidad anualizada.</p>{nota_analistas}
 </div>
 <div class="contact-block">
   <div><div class="brand">Tu Asesoría Financiera</div>
@@ -394,6 +506,8 @@ Para la cartera no se calcula un retorno total.</div>"""
     if varios:
         diapositivas.append(("Comparación", "Riesgo, retorno y Sharpe", riesgo_html))
         diapositivas.append(("Diversificación", "Matriz de correlaciones", correl_html))
+    if analistas:
+        diapositivas.append(("Analistas", "Proyecciones y precisión", _analistas_html(analistas)))
     diapositivas.append(("Metodología", "Cómo se calcula", metodo_html))
 
     cuerpo = portada + "".join(
@@ -430,13 +544,14 @@ def guardar_pdf(ruta_html: Path, ruta_pdf: Path) -> bool:
 
 
 def generar_reporte(carpeta: Path, cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa,
-                    resumenes, c, precios):
+                    resumenes, c, precios, analistas=None):
     """Guarda la presentación como reporte.html y reporte.pdf en `carpeta`."""
     carpeta.mkdir(parents=True, exist_ok=True)
     ruta_html = carpeta / "reporte.html"
     ruta_pdf = carpeta / "reporte.pdf"
     ruta_html.write_text(
-        armar_html(cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa, resumenes, c, precios),
+        armar_html(cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa, resumenes, c, precios,
+                   analistas),
         encoding="utf-8",
     )
     print(f"\nPresentación guardada en {ruta_html}")

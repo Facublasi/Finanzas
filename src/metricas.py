@@ -87,3 +87,106 @@ def resumen_cartera(
         "covarianzas": covarianzas,
         "correlaciones": retornos.corr(),
     }
+
+
+def _solo_fecha(indice: pd.Index) -> pd.DatetimeIndex:
+    """Lleva fechas con o sin zona horaria a fechas simples (sin hora)."""
+    indice = pd.DatetimeIndex(indice)
+    if indice.tz is not None:
+        indice = indice.tz_localize(None)
+    return indice.normalize()
+
+
+def precision_objetivos(
+    precios: pd.Series, splits: pd.Series, historial: pd.DataFrame, hoy, meses: int = 12
+) -> pd.DataFrame:
+    """Compara cada precio objetivo publicado con lo que pasó `meses` después.
+
+    `precios` son los cierres diarios (Yahoo los corrige por splits),
+    `splits` es {fecha: proporción} y `historial` tiene una fila por precio
+    objetivo publicado (columnas Firm y currentPriceTarget). Solo se evalúan
+    los objetivos que ya cumplieron `meses` de antigüedad.
+
+    Un objetivo por encima del precio del día espera una suba: se cumple si el
+    precio final está en el objetivo o por encima. Uno por debajo espera una
+    baja: se cumple si el precio final está en el objetivo o por debajo.
+    """
+    precios = pd.Series(precios.values, index=_solo_fecha(precios.index)).dropna()
+    splits = pd.Series(splits.values, index=_solo_fecha(splits.index))
+    historial = historial.copy()
+    historial.index = _solo_fecha(historial.index)
+    limite = min(pd.Timestamp(hoy), precios.index.max())
+
+    filas = []
+    for fecha, fila in historial.sort_index().iterrows():
+        objetivo = fila["currentPriceTarget"]
+        fin = fecha + pd.DateOffset(months=meses)
+        if not objetivo > 0 or fin > limite or fecha < precios.index.min():
+            continue
+        # Los objetivos no están corregidos por splits y los precios sí: un
+        # objetivo publicado antes de un split se divide por su proporción.
+        for fecha_split, proporcion in splits.items():
+            if fecha_split > fecha:
+                objetivo /= proporcion
+        inicial = precios[precios.index >= fecha].iloc[0]
+        tramo = precios[(precios.index > fecha) & (precios.index <= fin)]
+        final = tramo.iloc[-1]
+        alcista = objetivo >= inicial
+        filas.append({
+            "fecha": fecha,
+            "banco": fila["Firm"],
+            "objetivo": objetivo,
+            "precio_inicial": inicial,
+            "precio_final": final,
+            "suba_prometida": objetivo / inicial - 1,
+            "suba_real": final / inicial - 1,
+            "cumplido": final >= objetivo if alcista else final <= objetivo,
+            "tocado": tramo.max() >= objetivo if alcista else tramo.min() <= objetivo,
+        })
+    return pd.DataFrame(filas)
+
+
+def resumen_precision(detalle: pd.DataFrame) -> dict:
+    """Porcentaje de objetivos cumplidos y suba prometida contra suba real."""
+    if detalle.empty:
+        return {"evaluados": 0}
+    return {
+        "evaluados": len(detalle),
+        "cumplidos": detalle["cumplido"].mean(),
+        "tocados": detalle["tocado"].mean(),
+        "suba_prometida": detalle["suba_prometida"].mean(),
+        "suba_real": detalle["suba_real"].mean(),
+    }
+
+
+def precision_por_banco(detalles: list, minimo: int = 3) -> pd.DataFrame:
+    """Lo mismo que `resumen_precision`, por banco, sumando todas las acciones.
+
+    Solo incluye los bancos con al menos `minimo` objetivos evaluados.
+    """
+    todos = pd.concat([d for d in detalles if not d.empty], ignore_index=True) if detalles else pd.DataFrame()
+    if todos.empty:
+        return pd.DataFrame()
+    tabla = todos.groupby("banco").agg(
+        evaluados=("cumplido", "size"),
+        cumplidos=("cumplido", "mean"),
+        suba_prometida=("suba_prometida", "mean"),
+        suba_real=("suba_real", "mean"),
+    )
+    return tabla[tabla["evaluados"] >= minimo].sort_values("evaluados", ascending=False)
+
+
+def objetivo_implicito(tenencias: list, precio_etf: float) -> dict:
+    """Precio objetivo implícito de un ETF a partir de sus principales tenencias.
+
+    `tenencias` es una lista de {peso, precio, objetivo}. La suba esperada del
+    ETF es el promedio de la suba esperada de cada tenencia, ponderado por su
+    peso, contando solo las que tienen precio objetivo. `cobertura` es la
+    parte del ETF que representan esas tenencias.
+    """
+    con_dato = [t for t in tenencias if t.get("precio") and t.get("objetivo")]
+    cobertura = sum(t["peso"] for t in con_dato)
+    if cobertura == 0:
+        return {"cobertura": 0}
+    suba = sum(t["peso"] * (t["objetivo"] / t["precio"] - 1) for t in con_dato) / cobertura
+    return {"cobertura": cobertura, "suba": suba, "objetivo": precio_etf * (1 + suba)}

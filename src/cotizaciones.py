@@ -191,35 +191,50 @@ def analizar_analistas(tickers: list, hoy: date) -> dict:
     """Descarga los datos de analistas de cada activo y calcula su precisión
     (acciones) o su objetivo implícito (ETFs)."""
     resultados = {}
-    for ticker in tickers:
-        print(f"  Analistas de {ticker}...")
-        datos = descargar_analistas(ticker, hoy)
-        if datos is None:
-            resultados[ticker] = {"tipo": "Sin datos"}
-        elif datos["tipo"] == "ETF":
-            resultados[ticker] = {"tipo": "ETF", "precio": datos["precio"],
-                                  **objetivo_implicito(datos["tenencias"], datos["precio"])}
-        else:
-            actual = datos["objetivo_actual"]
-            if datos["historial"] is None:
-                # Yahoo no devolvió el historial: no es lo mismo que 0 objetivos.
-                detalle, precision = pd.DataFrame(), {"evaluados": None}
-            else:
-                detalle = precision_objetivos(datos["precios"], datos["splits"], datos["historial"], hoy)
-                precision = resumen_precision(detalle)
-            resultados[ticker] = {
-                "tipo": "Acción",
-                "precio": actual.get("current"),
-                # Promedio: es el "1y Target Est" que muestra Yahoo Finance.
-                "objetivo": actual.get("mean"),
-                "minimo": actual.get("low"),
-                "maximo": actual.get("high"),
-                "suba": actual["mean"] / actual["current"] - 1 if actual.get("mean") and actual.get("current") else None,
-                "detalle": detalle,
-                **precision,
-            }
+    pendientes = list(tickers)
+    for ronda in range(2):
+        if ronda == 1:
+            # Yahoo corta las ráfagas de consultas: los activos que fallaron se
+            # reintentan una vez al final, después de una pausa.
+            pendientes = [t for t, r in resultados.items()
+                          if r["tipo"] == "Sin datos" or (r["tipo"] == "Acción" and r.get("evaluados") is None)]
+            if not pendientes:
+                break
+            print(f"  Reintentando {', '.join(pendientes)} en 60 segundos...")
+            time.sleep(60)
+        for ticker in pendientes:
+            print(f"  Analistas de {ticker}...")
+            resultados[ticker] = _analizar_activo(ticker, hoy)
     bancos = precision_por_banco([r["detalle"] for r in resultados.values() if "detalle" in r])
     return {"activos": resultados, "bancos": bancos, "anios": ANIOS_ANALISTAS}
+
+
+def _analizar_activo(ticker: str, hoy: date) -> dict:
+    """Precisión de los analistas de una acción, u objetivo implícito de un ETF."""
+    datos = descargar_analistas(ticker, hoy)
+    if datos is None:
+        return {"tipo": "Sin datos"}
+    if datos["tipo"] == "ETF":
+        return {"tipo": "ETF", "precio": datos["precio"],
+                **objetivo_implicito(datos["tenencias"], datos["precio"])}
+    actual = datos["objetivo_actual"]
+    if datos["historial"] is None:
+        # Yahoo no devolvió el historial: no es lo mismo que 0 objetivos.
+        detalle, precision = pd.DataFrame(), {"evaluados": None}
+    else:
+        detalle = precision_objetivos(datos["precios"], datos["splits"], datos["historial"], hoy)
+        precision = resumen_precision(detalle)
+    return {
+        "tipo": "Acción",
+        "precio": actual.get("current"),
+        # Promedio: es el "1y Target Est" que muestra Yahoo Finance.
+        "objetivo": actual.get("mean"),
+        "minimo": actual.get("low"),
+        "maximo": actual.get("high"),
+        "suba": actual["mean"] / actual["current"] - 1 if actual.get("mean") and actual.get("current") else None,
+        "detalle": detalle,
+        **precision,
+    }
 
 
 def main():

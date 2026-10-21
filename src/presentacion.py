@@ -160,7 +160,8 @@ def mostrar_analistas(analistas: dict):
     }))
     print("\n  " + _NOTA_ANALISTAS.format(meses=analistas["anios"] * 12))
     for ticker, r in analistas["activos"].items():
-        if r["tipo"] == "Sin datos" or (r["tipo"] == "Acción" and r.get("evaluados") is None):
+        if (r["tipo"] == "Sin datos" or (r["tipo"] == "Acción" and r.get("evaluados") is None)
+                or (r["tipo"] == "ETF" and not r.get("cobertura"))):
             print(f"  Aviso: Yahoo no devolvió los datos de analistas de {ticker}. Probá de nuevo en unos minutos.")
     bancos = analistas["bancos"]
     if not bancos.empty:

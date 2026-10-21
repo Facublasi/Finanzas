@@ -187,6 +187,14 @@ def descargar_analistas(ticker: str, hoy: date):
     }
 
 
+def sin_datos_analistas(r: dict) -> bool:
+    """True si Yahoo no devolvió los datos de analistas de un activo: ninguna
+    respuesta, el historial de una acción o las tenencias de un ETF."""
+    return (r["tipo"] == "Sin datos"
+            or (r["tipo"] == "Acción" and r.get("evaluados") is None)
+            or (r["tipo"] == "ETF" and not r.get("cobertura")))
+
+
 def analizar_analistas(tickers: list, hoy: date) -> dict:
     """Descarga los datos de analistas de cada activo y calcula su precisión
     (acciones) o su objetivo implícito (ETFs)."""
@@ -196,8 +204,7 @@ def analizar_analistas(tickers: list, hoy: date) -> dict:
         if ronda == 1:
             # Yahoo corta las ráfagas de consultas: los activos que fallaron se
             # reintentan una vez al final, después de una pausa.
-            pendientes = [t for t, r in resultados.items()
-                          if r["tipo"] == "Sin datos" or (r["tipo"] == "Acción" and r.get("evaluados") is None)]
+            pendientes = [t for t, r in resultados.items() if sin_datos_analistas(r)]
             if not pendientes:
                 break
             print(f"  Reintentando {', '.join(pendientes)} en 60 segundos...")

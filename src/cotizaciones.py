@@ -173,7 +173,7 @@ def descargar_analistas(ticker: str, hoy: date):
                 "ticker": simbolo,
                 "peso": float(fila["Holding Percent"]),
                 "precio": objetivos.get("current"),
-                "objetivo": objetivos.get("mean"),
+                "objetivo": objetivos.get("median"),
             })
         return {"tipo": "ETF", "precio": float(precios["Close"].iloc[-1]), "tenencias": tenencias}
 
@@ -210,8 +210,11 @@ def analizar_analistas(tickers: list, hoy: date) -> dict:
             resultados[ticker] = {
                 "tipo": "Acción",
                 "precio": actual.get("current"),
-                "objetivo": actual.get("mean"),
-                "suba": actual["mean"] / actual["current"] - 1 if actual.get("mean") and actual.get("current") else None,
+                # Mediana: a diferencia del promedio, no la mueve un analista extremo.
+                "objetivo": actual.get("median"),
+                "minimo": actual.get("low"),
+                "maximo": actual.get("high"),
+                "suba": actual["median"] / actual["current"] - 1 if actual.get("median") and actual.get("current") else None,
                 "detalle": detalle,
                 **precision,
             }

@@ -113,6 +113,7 @@ def _tabla_analistas(analistas: dict) -> pd.DataFrame:
                 "Tipo": f"ETF ({cobertura:.0%} cubierto)" if cobertura else "ETF (sin datos)",
                 "Precio": r["precio"],
                 "Objetivo": r.get("objetivo"),
+                "Rango": None,
                 "Suba esperada": r.get("suba"),
                 "Evaluados": None, "Cumplidos": None, "Tocados": None,
                 "Suba prometida": None, "Suba real": None,
@@ -122,8 +123,9 @@ def _tabla_analistas(analistas: dict) -> pd.DataFrame:
                 "Tipo": "Acción",
                 "Precio": r.get("precio"),
                 "Objetivo": r.get("objetivo"),
+                "Rango": f"{r['minimo']:.2f} a {r['maximo']:.2f}" if r.get("minimo") and r.get("maximo") else None,
                 "Suba esperada": r.get("suba"),
-                "Evaluados": r.get("evaluados", 0),
+                "Evaluados": r.get("evaluados"),
                 "Cumplidos": r.get("cumplidos"),
                 "Tocados": r.get("tocados"),
                 "Suba prometida": r.get("suba_prometida"),
@@ -145,7 +147,8 @@ def mostrar_analistas(analistas: dict):
         "Precio": numero, "Objetivo": numero, "Suba esperada": _pct, "Evaluados": entero,
         "Cumplidos": simple, "Tocados": simple, "Suba prometida": _pct, "Suba real": _pct,
     }))
-    print(f"\n  Objetivo: promedio actual de los analistas (en los ETF, implícito por sus 10 principales tenencias).")
+    print(f"\n  Objetivo: mediana actual de los analistas; Rango: objetivo mínimo y máximo"
+          " (en los ETF, implícito por sus 10 principales tenencias).")
     print(f"  Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses,"
           " comparados con el precio 12 meses después.")
     for ticker, r in analistas["activos"].items():
@@ -355,14 +358,15 @@ def _analistas_html(analistas: dict) -> str:
     tabla = _tabla_analistas(analistas)
     filas = "".join(
         f'<tr><td class="tk">{html.escape(t)}</td><td>{html.escape(str(f.get("Tipo", "")))}</td>'
-        + celda(f.get("Precio"), numero) + celda(f.get("Objetivo"), numero) + celda(f.get("Suba esperada"), _pct)
+        + celda(f.get("Precio"), numero) + celda(f.get("Objetivo"), numero) + celda(f.get("Rango"), str)
+        + celda(f.get("Suba esperada"), _pct)
         + celda(f.get("Evaluados"), entero) + celda(f.get("Cumplidos"), simple) + celda(f.get("Tocados"), simple)
         + celda(f.get("Suba prometida"), _pct) + celda(f.get("Suba real"), _pct) + "</tr>"
         for t, f in tabla.iterrows()
     )
     contenido = f"""
 <table class="compacta">
-  <thead><tr><th>Activo</th><th>Tipo</th><th class="r">Precio</th><th class="r">Objetivo</th><th class="r">Suba esperada</th>
+  <thead><tr><th>Activo</th><th>Tipo</th><th class="r">Precio</th><th class="r">Objetivo</th><th class="r">Rango</th><th class="r">Suba esperada</th>
   <th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Tocados</th><th class="r">Suba prometida</th><th class="r">Suba real</th></tr></thead>
   <tbody>{filas}</tbody>
 </table>"""
@@ -380,7 +384,7 @@ def _analistas_html(analistas: dict) -> str:
   <tbody>{filas}</tbody>
 </table>"""
     contenido += f"""
-<div class="note">Objetivo: promedio actual de los analistas; en los ETF, implícito a partir de sus 10 principales tenencias.
+<div class="note">Objetivo: mediana actual de los analistas; Rango: objetivo mínimo y máximo. En los ETF, el objetivo es implícito a partir de sus 10 principales tenencias.
 Evaluados: objetivos publicados entre hace {analistas['anios'] * 12} y hace 12 meses, comparados con el precio de cierre 12 meses después.
 Cumplidos: el precio final alcanzó el objetivo. Tocados: lo alcanzó en algún momento de esos 12 meses.</div>"""
     return contenido

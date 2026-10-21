@@ -8,8 +8,8 @@ import pandas as pd
 import yfinance as yf
 
 from metricas import (
-    objetivo_implicito, objetivos_publicados, precision_objetivos, precision_por_banco, resumen,
-    resumen_cartera, resumen_precision, tendencia_objetivos,
+    consenso_contra_realidad, objetivo_implicito, objetivos_publicados, precision_objetivos,
+    precision_por_banco, resumen, resumen_cartera, resumen_precision, tendencia_objetivos,
 )
 from presentacion import (
     generar_reporte, mostrar_analistas, mostrar_cartera, mostrar_comparativa, mostrar_detalle,
@@ -19,9 +19,11 @@ from presentacion import (
 # EE.UU. a 13 semanas.
 TICKER_TASA = "^IRX"
 
-# Años de precios que se descargan para medir la precisión de los analistas.
-# Cada objetivo se evalúa 12 meses después de publicado, así que con 3 años se
-# evalúan los publicados entre hace 36 y hace 12 meses.
+# Años de objetivos de analistas que se evalúan. Cada objetivo se compara con
+# el precio 12 meses después, así que con 3 años se evalúan los publicados
+# entre hace 36 y hace 12 meses. Se descarga un año más de precios porque el
+# consenso de hace 36 meses usa objetivos de hasta 12 meses antes, y hay que
+# corregirlos por los splits de ese período.
 ANIOS_ANALISTAS = 3
 
 # Carpeta donde se guarda la presentación (HTML y PDF).
@@ -156,7 +158,7 @@ def descargar_analistas(ticker: str, hoy: date):
     Yahoo no responde.
     """
     activo = yf.Ticker(ticker)
-    inicio = hoy - timedelta(days=365 * ANIOS_ANALISTAS + 7)
+    inicio = hoy - timedelta(days=365 * (ANIOS_ANALISTAS + 1) + 7)
     precios = _con_reintentos(
         lambda: activo.history(start=inicio, end=hoy + timedelta(days=1), auto_adjust=False)
     )
@@ -227,12 +229,13 @@ def _analizar_activo(ticker: str, hoy: date) -> dict:
     actual = datos["objetivo_actual"]
     if datos["historial"] is None:
         # Yahoo no devolvió el historial: no es lo mismo que 0 objetivos.
-        detalle, precision, tendencia = pd.DataFrame(), {"evaluados": None}, None
+        detalle, precision, tendencia, historia = pd.DataFrame(), {"evaluados": None}, None, None
     else:
         objetivos = objetivos_publicados(datos["historial"], datos["splits"])
         detalle = precision_objetivos(datos["precios"], objetivos, hoy)
         precision = resumen_precision(detalle)
         tendencia = tendencia_objetivos(objetivos, hoy)
+        historia = consenso_contra_realidad(objetivos, datos["precios"], hoy, ANIOS_ANALISTAS)
     return {
         "tipo": "Acción",
         "precio": actual.get("current"),
@@ -242,6 +245,7 @@ def _analizar_activo(ticker: str, hoy: date) -> dict:
         "maximo": actual.get("high"),
         "suba": actual["mean"] / actual["current"] - 1 if actual.get("mean") and actual.get("current") else None,
         "tendencia": tendencia,
+        "historia": historia,
         "detalle": detalle,
         **precision,
     }

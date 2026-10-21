@@ -113,26 +113,47 @@ def _tabla_analistas(analistas: dict) -> pd.DataFrame:
             cobertura = r.get("cobertura", 0)
             nombre = f"{ticker} (ETF, {cobertura:.0%})" if cobertura else f"{ticker} (ETF)"
             filas[nombre] = {"Precio": r["precio"], "Objetivo": r.get("objetivo"),
-                             "Suba esperada": r.get("suba")}
+                             "Suba esperada a 12 meses": r.get("suba")}
         elif r["tipo"] == "Acción":
             filas[ticker] = {
                 "Precio": r.get("precio"),
                 "Objetivo": r.get("objetivo"),
                 "Rango": f"{r['minimo']:.2f} a {r['maximo']:.2f}" if r.get("minimo") and r.get("maximo") else None,
-                "Suba esperada": r.get("suba"),
+                "Suba esperada a 12 meses": r.get("suba"),
                 "Tendencia 3m": r.get("tendencia"),
                 "Evaluados": r.get("evaluados"),
                 "Cumplidos": r.get("cumplidos"),
                 "Tocados": r.get("tocados"),
-                "Suba prometida": r.get("suba_prometida"),
-                "Suba real": r.get("suba_real"),
-                "Error típico": r.get("error"),
             }
         else:
             filas[ticker] = {}
-    columnas = ["Precio", "Objetivo", "Rango", "Suba esperada", "Tendencia 3m", "Evaluados",
-                "Cumplidos", "Tocados", "Suba prometida", "Suba real", "Error típico"]
+    columnas = ["Precio", "Objetivo", "Rango", "Suba esperada a 12 meses", "Tendencia 3m",
+                "Evaluados", "Cumplidos", "Tocados"]
     return pd.DataFrame.from_dict(filas, orient="index").reindex(columns=columnas)
+
+
+def _tabla_consenso(analistas: dict) -> pd.DataFrame:
+    """Una fila por acción: para hace 36, 24 y 12 meses, lo que prometía el
+    consenso y lo que subió la acción en los 12 meses siguientes, y la suba
+    real anualizada de todo el período."""
+    filas = {}
+    for ticker, r in analistas["activos"].items():
+        historia = r.get("historia")
+        if r["tipo"] != "Acción" or not historia:
+            continue
+        fila = {}
+        for meses, valores in historia.items():
+            if meses == "anualizada":
+                continue
+            fila[(f"Hace {meses} meses", "Prometía")] = valores["prometida"]
+            fila[(f"Hace {meses} meses", "Subió")] = valores["real"]
+        fila[(f"{analistas['anios'] * 12} meses", "Anualizada")] = historia["anualizada"]
+        filas[ticker] = fila
+    if not filas:
+        return pd.DataFrame()
+    tabla = pd.DataFrame.from_dict(filas, orient="index")
+    tabla.columns = pd.MultiIndex.from_tuples(tabla.columns)
+    return tabla
 
 
 _NOTA_ANALISTAS = (
@@ -141,34 +162,42 @@ _NOTA_ANALISTAS = (
     "la parte del ETF que cubren). Tendencia 3m: cuánto cambió el consenso en los últimos 3 meses. "
     "Evaluados: objetivos publicados entre hace {meses} y hace 12 meses (uno por banco por trimestre), "
     "comparados con el precio de cierre 12 meses después. Cumplidos: el precio final alcanzó el objetivo. "
-    "Tocados: lo alcanzó en algún momento de esos 12 meses. Suba prometida, suba real y error típico "
-    "(real − prometida) son medianas."
+    "Tocados: lo alcanzó en algún momento de esos 12 meses."
+)
+_NOTA_CONSENSO = (
+    "Prometía: cuánto esperaba subir en 12 meses el consenso de ese día (promedio del último objetivo de cada "
+    "banco). Subió: cuánto subió de verdad la acción en esos 12 meses. Los años no se superponen: compuestos, "
+    "dan la suba total del período. Anualizada: promedio geométrico de las subas de cada año."
 )
 
 
 def mostrar_analistas(analistas: dict):
-    """Objetivo actual de cada activo, precisión histórica y precisión por banco."""
+    """Objetivo actual de cada activo, consenso contra realidad y precisión por banco."""
     tabla = _tabla_analistas(analistas)
     numero = lambda v: "—" if v is None or pd.isna(v) else f"{v:.2f}"
     entero = lambda v: "—" if v is None or pd.isna(v) else f"{int(v)}"
     simple = lambda v: "—" if v is None or pd.isna(v) else f"{v:.0%}"
     print("\nProyecciones de analistas")
     print(tabla.to_string(na_rep="—", formatters={
-        "Precio": numero, "Objetivo": numero, "Suba esperada": _pct, "Tendencia 3m": _pct,
-        "Evaluados": entero, "Cumplidos": simple, "Tocados": simple, "Suba prometida": _pct,
-        "Suba real": _pct, "Error típico": _pct,
+        "Precio": numero, "Objetivo": numero, "Suba esperada a 12 meses": _pct, "Tendencia 3m": _pct,
+        "Evaluados": entero, "Cumplidos": simple, "Tocados": simple,
     }))
     print("\n  " + _NOTA_ANALISTAS.format(meses=analistas["anios"] * 12))
     for ticker, r in analistas["activos"].items():
         if (r["tipo"] == "Sin datos" or (r["tipo"] == "Acción" and r.get("evaluados") is None)
                 or (r["tipo"] == "ETF" and not r.get("cobertura"))):
             print(f"  Aviso: Yahoo no devolvió los datos de analistas de {ticker}. Probá de nuevo en unos minutos.")
+    consenso = _tabla_consenso(analistas)
+    if not consenso.empty:
+        print("\nConsenso contra realidad, a 12 meses")
+        print(consenso.to_string(na_rep="—", float_format=lambda v: _pct(v)))
+        print("\n  " + _NOTA_CONSENSO)
     bancos = analistas["bancos"]
     if not bancos.empty:
         print("\nPrecisión por banco (al menos 3 objetivos evaluados)")
         print(bancos.rename_axis(None).to_string(
-            header=["Evaluados", "Cumplidos", "Suba prometida", "Suba real", "Error típico"],
-            formatters={"cumplidos": simple, "suba_prometida": _pct, "suba_real": _pct, "error": _pct},
+            header=["Evaluados", "Cumplidos", "Tocados"],
+            formatters={"cumplidos": simple, "tocados": simple},
         ))
 
 
@@ -355,7 +384,8 @@ def _signo(valor: float) -> str:
 
 
 def _analistas_html(analistas: dict) -> str:
-    """Tabla de proyecciones por activo y, si hay, la precisión por banco."""
+    """Tabla de proyecciones por activo, consenso contra realidad y, si hay,
+    la precisión por banco."""
     def celda(valor, formato):
         if valor is None or pd.isna(valor):
             return '<td class="r">—</td>'
@@ -363,9 +393,8 @@ def _analistas_html(analistas: dict) -> str:
         return f"<td{clase}>{formato(valor)}</td>"
     formatos = {
         "Precio": lambda v: f"{v:.2f}", "Objetivo": lambda v: f"{v:.2f}", "Rango": str,
-        "Suba esperada": _pct, "Tendencia 3m": _pct, "Evaluados": lambda v: f"{int(v)}",
+        "Suba esperada a 12 meses": _pct, "Tendencia 3m": _pct, "Evaluados": lambda v: f"{int(v)}",
         "Cumplidos": lambda v: f"{v:.0%}", "Tocados": lambda v: f"{v:.0%}",
-        "Suba prometida": _pct, "Suba real": _pct, "Error típico": _pct,
     }
 
     tabla = _tabla_analistas(analistas)
@@ -380,23 +409,42 @@ def _analistas_html(analistas: dict) -> str:
   <thead><tr><th>Activo</th>{cabecera}</tr></thead>
   <tbody>{filas}</tbody>
 </table>"""
-    bancos = analistas["bancos"].head(5)
+
+    consenso = _tabla_consenso(analistas)
+    if not consenso.empty:
+        grupos = list(dict.fromkeys(consenso.columns.get_level_values(0)))
+        arriba = "".join(
+            f'<th class="r" colspan="{(consenso.columns.get_level_values(0) == g).sum()}">{html.escape(g)}</th>'
+            for g in grupos
+        )
+        abajo = "".join(f'<th class="r">{html.escape(c)}</th>' for _, c in consenso.columns)
+        filas = "".join(
+            f'<tr><td class="tk">{html.escape(t)}</td>' + "".join(celda(v, _pct) for v in f.values) + "</tr>"
+            for t, f in consenso.iterrows()
+        )
+        contenido += f"""
+<div class="sec"><span class="bar"></span><h2>Consenso contra realidad, a 12 meses</h2></div>
+<table class="compacta">
+  <thead><tr><th rowspan="2">Acción</th>{arriba}</tr><tr>{abajo}</tr></thead>
+  <tbody>{filas}</tbody>
+</table>"""
+
+    bancos = analistas["bancos"].head(4)
     if not bancos.empty:
         filas = "".join(
             f'<tr><td class="tk">{html.escape(banco)}</td>' + celda(f["evaluados"], formatos["Evaluados"])
-            + celda(f["cumplidos"], formatos["Cumplidos"]) + celda(f["suba_prometida"], _pct)
-            + celda(f["suba_real"], _pct) + celda(f["error"], _pct) + "</tr>"
+            + celda(f["cumplidos"], formatos["Cumplidos"]) + celda(f["tocados"], formatos["Tocados"]) + "</tr>"
             for banco, f in bancos.iterrows()
         )
         contenido += f"""
 <div class="sec"><span class="bar"></span><h2>Precisión por banco</h2></div>
 <table class="compacta">
-  <thead><tr><th>Banco</th><th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Suba prometida</th>
-  <th class="r">Suba real</th><th class="r">Error típico</th></tr></thead>
+  <thead><tr><th>Banco</th><th class="r">Evaluados</th><th class="r">Cumplidos</th><th class="r">Tocados</th></tr></thead>
   <tbody>{filas}</tbody>
 </table>"""
+    nota = _NOTA_ANALISTAS.format(meses=analistas["anios"] * 12) + " " + _NOTA_CONSENSO
     contenido += f'''
-<div class="note">{html.escape(_NOTA_ANALISTAS.format(meses=analistas["anios"] * 12))}</div>'''
+<div class="note">{html.escape(nota)}</div>'''
     return contenido
 
 

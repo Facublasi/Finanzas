@@ -152,8 +152,6 @@ def precision_objetivos(precios: pd.Series, objetivos: pd.DataFrame, hoy, meses:
             "precio_final": final,
             "suba_prometida": objetivo / inicial - 1,
             "suba_real": final / inicial - 1,
-            # Error: cuánto se equivocó el objetivo (positivo = la acción subió más de lo prometido).
-            "error": final / inicial - objetivo / inicial,
             "cumplido": final >= objetivo if alcista else final <= objetivo,
             "tocado": tramo.max() >= objetivo if alcista else tramo.min() <= objetivo,
         })
@@ -161,18 +159,18 @@ def precision_objetivos(precios: pd.Series, objetivos: pd.DataFrame, hoy, meses:
 
 
 def resumen_precision(detalle: pd.DataFrame) -> dict:
-    """Porcentaje de objetivos cumplidos y tocados, y medianas de la suba
-    prometida, la suba real y el error. Se usa la mediana para que unas pocas
-    subas extremas no distorsionen el resultado."""
+    """Porcentaje de objetivos cumplidos y tocados.
+
+    No se resumen las subas de cada objetivo en un promedio o mediana: las
+    ventanas de 12 meses se superponen y mezclan años muy distintos. La
+    comparación de subas se hace con `consenso_contra_realidad`.
+    """
     if detalle.empty:
         return {"evaluados": 0}
     return {
         "evaluados": len(detalle),
         "cumplidos": detalle["cumplido"].mean(),
         "tocados": detalle["tocado"].mean(),
-        "suba_prometida": detalle["suba_prometida"].median(),
-        "suba_real": detalle["suba_real"].median(),
-        "error": detalle["error"].median(),
     }
 
 
@@ -187,32 +185,67 @@ def precision_por_banco(detalles: list, minimo: int = 3) -> pd.DataFrame:
     tabla = todos.groupby("banco").agg(
         evaluados=("cumplido", "size"),
         cumplidos=("cumplido", "mean"),
-        suba_prometida=("suba_prometida", "median"),
-        suba_real=("suba_real", "median"),
-        error=("error", "median"),
+        tocados=("tocado", "mean"),
     )
     return tabla[tabla["evaluados"] >= minimo].sort_values("evaluados", ascending=False)
 
 
-def tendencia_objetivos(objetivos: pd.DataFrame, hoy, meses: int = 3, vigencia: int = 12):
-    """Variación del consenso de los analistas en los últimos `meses`.
+def consenso(objetivos: pd.DataFrame, fecha, vigencia: int = 12):
+    """Consenso de los analistas a una fecha: promedio del último objetivo de
+    cada banco publicado en los `vigencia` meses anteriores (un objetivo más
+    viejo se considera vencido). Devuelve None si no hay ninguno vigente."""
+    fecha = pd.Timestamp(fecha)
+    vigentes = objetivos[(objetivos["fecha"] <= fecha)
+                         & (objetivos["fecha"] > fecha - pd.DateOffset(months=vigencia))]
+    if vigentes.empty:
+        return None
+    return vigentes.groupby("banco").tail(1)["objetivo"].mean()
 
-    El consenso a una fecha es el promedio del último objetivo de cada banco
-    publicado en los `vigencia` meses anteriores (un objetivo más viejo se
-    considera vencido). Devuelve None si falta el consenso de alguna fecha.
-    """
-    def consenso(fecha):
-        vigentes = objetivos[(objetivos["fecha"] <= fecha)
-                             & (objetivos["fecha"] > fecha - pd.DateOffset(months=vigencia))]
-        if vigentes.empty:
-            return None
-        return vigentes.groupby("banco").tail(1)["objetivo"].mean()
 
-    hoy = pd.Timestamp(hoy)
-    actual, anterior = consenso(hoy), consenso(hoy - pd.DateOffset(months=meses))
+def tendencia_objetivos(objetivos: pd.DataFrame, hoy, meses: int = 3):
+    """Variación del consenso de los analistas en los últimos `meses`."""
+    actual = consenso(objetivos, hoy)
+    anterior = consenso(objetivos, pd.Timestamp(hoy) - pd.DateOffset(months=meses))
     if actual is None or anterior is None:
         return None
     return actual / anterior - 1
+
+
+def consenso_contra_realidad(objetivos: pd.DataFrame, precios: pd.Series, hoy, anios: int = 3) -> dict:
+    """Para hace 12, 24, ... meses: cuánto prometía subir el consenso de ese
+    día y cuánto subió de verdad la acción en los 12 meses siguientes.
+
+    Es una sola predicción por fecha, sin superponer ventanas: las subas
+    reales de cada año, compuestas, dan la suba total del período. Devuelve
+    {meses atrás: {"prometida", "real"}} y, en "anualizada", la suba real
+    anualizada de todo el período (promedio geométrico de las subas de cada
+    año). None donde falta el dato.
+    """
+    precios = pd.Series(precios.values, index=_solo_fecha(precios.index)).dropna()
+    hoy = pd.Timestamp(hoy)
+    resultado = {}
+    for anio in range(anios, 0, -1):
+        fecha = hoy - pd.DateOffset(months=12 * anio)
+        fin = fecha + pd.DateOffset(months=12)
+        valor = consenso(objetivos, fecha)
+        desde = precios[precios.index <= fecha]
+        hasta = precios[precios.index <= fin]
+        if valor is None or desde.empty or hasta.empty:
+            resultado[12 * anio] = {"prometida": None, "real": None}
+            continue
+        resultado[12 * anio] = {
+            "prometida": valor / desde.iloc[-1] - 1,
+            "real": hasta.iloc[-1] / desde.iloc[-1] - 1,
+        }
+    reales = [r["real"] for r in resultado.values()]
+    if all(r is not None for r in reales):
+        compuesta = 1.0
+        for r in reales:
+            compuesta *= 1 + r
+        resultado["anualizada"] = compuesta ** (1 / anios) - 1
+    else:
+        resultado["anualizada"] = None
+    return resultado
 
 
 def objetivo_implicito(tenencias: list, precio_etf: float) -> dict:

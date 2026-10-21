@@ -74,15 +74,16 @@ Cartera (59 retornos)
 
 Si respondés `s` a la última pregunta, el programa descarga de Yahoo Finance los precios objetivo de los analistas y muestra una tabla con:
 
-- **Objetivo y Rango**: promedio actual de los precios objetivo (el "1y Target Est" que muestra Yahoo Finance) y el mínimo y máximo. **Suba esperada**: cuánto tendría que subir la acción desde el precio de hoy para llegar al promedio.
+- **Objetivo y Rango**: promedio actual de los precios objetivo (el "1y Target Est" que muestra Yahoo Finance) y el mínimo y máximo. **Suba esperada a 12 meses**: cuánto tendría que subir la acción desde el precio de hoy para llegar al promedio.
 - **Tendencia 3m**: cuánto cambió el consenso en los últimos 3 meses. El consenso a una fecha es el promedio del último objetivo de cada banco publicado en los 12 meses anteriores. Por eso puede no coincidir exactamente con el promedio de Yahoo.
 - **Precisión de los objetivos pasados** (solo acciones): toma los objetivos publicados entre hace 36 y hace 12 meses y los compara con el precio de cierre 12 meses después. Si un banco publicó varias veces en el mismo trimestre, se usa solo el último, para que los bancos que confirman su objetivo seguido no pesen más.
   - **Evaluados**: cantidad de objetivos comparados.
   - **Cumplidos**: porcentaje en el que el precio final alcanzó el objetivo (o bajó hasta él, si el objetivo esperaba una baja).
   - **Tocados**: porcentaje en el que el precio lo alcanzó en algún momento de esos 12 meses.
-  - **Suba prometida**: mediana de cuánto prometía subir cada objetivo desde el precio del día en que se publicó. **Suba real**: mediana de cuánto subió de verdad en los 12 meses siguientes.
-  - **Error típico**: mediana de suba real − suba prometida de cada objetivo. Positivo: la acción subió más de lo prometido; negativo, menos. Se usan medianas para que unas pocas subas extremas no distorsionen el resultado.
-- **Precisión por banco**: lo mismo, por banco, sumando todas las acciones (solo bancos con al menos 3 objetivos evaluados).
+- **Consenso contra realidad, a 12 meses** (solo acciones): para hace 36, 24 y 12 meses, cuánto prometía subir el consenso de ese día y cuánto subió de verdad la acción en los 12 meses siguientes. Es una sola predicción por año y los años no se superponen: las subas de cada año, compuestas, dan la suba total del período. La última columna es la suba real anualizada (promedio geométrico).
+
+No se promedian las subas de cada objetivo individual: sus ventanas de 12 meses se superponen y mezclan años muy distintos.
+- **Precisión por banco**: cumplidos y tocados por banco, sumando todas las acciones (solo bancos con al menos 3 objetivos evaluados).
 
 Los precios objetivo publicados antes de un split se corrigen por su proporción, para compararlos con los precios en la misma escala.
 
@@ -105,7 +106,7 @@ Cada vez que se corre el programa, los dos archivos se reemplazan. Las diapositi
 4. **Evolución de precios**: gráfico de cada activo con los precios llevados a 100 al inicio del período.
 5. **Riesgo, retorno y Sharpe**: gráfico de volatilidad contra retorno y barras con el Sharpe de cada activo y de la cartera.
 6. **Correlaciones**: mapa de calor con la mitad de abajo de la matriz (es simétrica y la diagonal siempre vale 1). Usa su propia escala de colores: rojo para −1, amarillo para 0 y verde para 1. La matriz de covarianzas se muestra solo en pantalla.
-7. **Analistas** (solo si se pidió): la tabla de proyecciones por activo y los 5 bancos con más objetivos evaluados.
+7. **Analistas** (solo si se pidió): la tabla de proyecciones por activo, el consenso contra la realidad a 12 meses y los 4 bancos con más objetivos evaluados.
 8. **Metodología**: cómo se calcula cada métrica, y los datos de contacto.
 
 Con un solo activo no se incluyen las diapositivas 5 y 6. Los valores son los mismos que se muestran en pantalla, con el mismo redondeo.

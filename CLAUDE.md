@@ -20,7 +20,7 @@ Es un único programa en tres archivos: datos (`cotizaciones.py`), cálculos (`m
 4. Tasa libre de riesgo: promedio de `^IRX` entre las fechas. **No se pregunta.**
 5. Por activo: retorno logarítmico, retorno anualizado, volatilidad anualizada y Sharpe.
 6. Cartera: retorno esperado `Σ w·E(R)`, volatilidad `√(wᵀΣw)`, Sharpe, matrices de covarianzas y correlaciones.
-7. Opcional: proyecciones de analistas de Yahoo (promedio y rango del precio objetivo actual, igual que Yahoo Finance; tendencia del consenso en 3 meses; precisión de los objetivos publicados entre hace 36 y 12 meses, uno por banco por trimestre, con medianas de suba prometida, real y error, por activo y por banco; objetivo implícito de los ETF por sus 10 principales tenencias). Los objetivos anteriores a un split se dividen por su proporción.
+7. Opcional: proyecciones de analistas de Yahoo (promedio y rango del precio objetivo actual, igual que Yahoo Finance; tendencia del consenso en 3 meses; precisión de los objetivos publicados entre hace 36 y 12 meses, uno por banco por trimestre (cumplidos y tocados, por activo y por banco); consenso de hace 36, 24 y 12 meses contra la suba real de los 12 meses siguientes, sin ventanas superpuestas, y suba real anualizada; objetivo implícito de los ETF por sus 10 principales tenencias). Los objetivos anteriores a un split se dividen por su proporción.
 8. Guarda una presentación tipo diapositivas (16:9) en HTML y PDF con la marca Tu Asesoría Financiera: paleta azul marino, dorado y crema; logo y datos de contacto. El PDF se genera con Playwright (Chromium); si no está, queda solo el HTML.
 
 ## Decisiones tomadas (no cambiar sin que el usuario lo pida)

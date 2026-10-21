@@ -28,6 +28,7 @@ Frecuencia:
   2) Semanal
   3) Mensual
 Elegí una opción [1]: 3
+¿Analizar proyecciones de analistas? (s/n) [n]: s
 ```
 
 - Cada activo se escribe con su peso en la cartera, en %, separados por coma. Los pesos tienen que ser mayores a 0 y sumar 100%; si no, el programa avisa y vuelve a preguntar. Para decimales se usa punto (ej: `AAPL 33.33`).
@@ -69,6 +70,24 @@ Cartera (59 retornos)
   Sharpe ratio:       0.07
 ```
 
+## Proyecciones de analistas
+
+Si respondés `s` a la última pregunta, el programa descarga de Yahoo Finance los precios objetivo de los analistas y muestra una tabla con:
+
+- **Objetivo y Rango**: mediana actual de los precios objetivo y el mínimo y máximo. **Suba esperada**: cuánto tendría que subir la acción desde el precio de hoy para llegar a la mediana.
+- **Precisión de los objetivos pasados** (solo acciones): toma los objetivos publicados entre hace 36 y hace 12 meses y los compara con el precio de cierre 12 meses después.
+  - **Evaluados**: cantidad de objetivos comparados.
+  - **Cumplidos**: porcentaje en el que el precio final alcanzó el objetivo (o bajó hasta él, si el objetivo esperaba una baja).
+  - **Tocados**: porcentaje en el que el precio lo alcanzó en algún momento de esos 12 meses.
+  - **Suba prometida**: promedio de cuánto prometía subir cada objetivo desde el precio del día en que se publicó. **Suba real**: promedio de cuánto subió de verdad en los 12 meses siguientes.
+- **Precisión por banco**: lo mismo, por banco, sumando todas las acciones (solo bancos con al menos 3 objetivos evaluados).
+
+Los precios objetivo publicados antes de un split se corrigen por su proporción, para compararlos con los precios en la misma escala.
+
+Los ETF no tienen analistas propios. Para ellos se calcula un **objetivo implícito**: el promedio de la suba esperada de sus 10 principales tenencias, ponderado por su peso. La tabla indica qué porcentaje del ETF cubren esas tenencias. La precisión pasada no se puede medir para los ETF, porque no hay registro de su composición anterior.
+
+Yahoo limita las consultas cuando son muchas seguidas: el programa reintenta y, si no lo logra, avisa qué activo quedó sin datos.
+
 ## Presentación
 
 Además de mostrar los resultados en pantalla, el programa guarda una presentación con la estética de Tu Asesoría Financiera en la carpeta `reportes/`:
@@ -84,7 +103,8 @@ Cada vez que se corre el programa, los dos archivos se reemplazan. Las diapositi
 4. **Evolución de precios**: gráfico de cada activo con los precios llevados a 100 al inicio del período.
 5. **Riesgo, retorno y Sharpe**: gráfico de volatilidad contra retorno y barras con el Sharpe de cada activo y de la cartera.
 6. **Correlaciones**: mapa de calor con la mitad de abajo de la matriz (es simétrica y la diagonal siempre vale 1). Usa su propia escala de colores: rojo para −1, amarillo para 0 y verde para 1. La matriz de covarianzas se muestra solo en pantalla.
-7. **Metodología**: cómo se calcula cada métrica, y los datos de contacto.
+7. **Analistas** (solo si se pidió): la tabla de proyecciones por activo y los 5 bancos con más objetivos evaluados.
+8. **Metodología**: cómo se calcula cada métrica, y los datos de contacto.
 
 Con un solo activo no se incluyen las diapositivas 5 y 6. Los valores son los mismos que se muestran en pantalla, con el mismo redondeo.
 

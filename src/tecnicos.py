@@ -218,3 +218,68 @@ def resumen_dmi(maximos: pd.Series, minimos: pd.Series, cierres: pd.Series) -> d
         "desde": cambios[-1] if len(cambios) else None,
         "adx_subiendo": pendiente > 0,
     }
+
+
+# ---------------------------------------------------------------------------
+# MACD y divergencias
+# ---------------------------------------------------------------------------
+
+MACD_RAPIDA, MACD_LENTA, MACD_SENAL = 12, 26, 9
+# Días hábiles hacia atrás para ver si el histograma mejora o empeora.
+DIAS_PENDIENTE_HISTOGRAMA = 5
+
+
+def macd(cierres: pd.Series, rapida: int = MACD_RAPIDA, lenta: int = MACD_LENTA, senal: int = MACD_SENAL):
+    """Línea MACD (media exponencial rápida − lenta), línea de señal (media
+    exponencial de la MACD) e histograma (MACD − señal)."""
+    exponencial = lambda serie, dias: serie.ewm(span=dias, adjust=False).mean()
+    linea = exponencial(cierres, rapida) - exponencial(cierres, lenta)
+    linea_senal = exponencial(linea, senal)
+    return linea, linea_senal, linea - linea_senal
+
+
+def divergencias(giros: pd.DataFrame, linea_macd: pd.Series) -> list:
+    """Compara el precio y el MACD en los dos últimos máximos y en los dos
+    últimos mínimos de la estructura.
+
+    Clásica bajista: precio HH y MACD más bajo. Clásica alcista: precio LL y
+    MACD más alto. Oculta bajista: precio LH y MACD más alto. Oculta alcista:
+    precio HL y MACD más bajo. Si los giros son iguales (EH/EL) no se evalúa.
+    """
+    resultado = []
+    tipos = {
+        "máximo": {"HH": ("Clásica bajista", lambda m: m < 0), "LH": ("Oculta bajista", lambda m: m > 0)},
+        "mínimo": {"LL": ("Clásica alcista", lambda m: m > 0), "HL": ("Oculta alcista", lambda m: m < 0)},
+    }
+    for tipo, reglas in tipos.items():
+        ultimos = giros[giros["tipo"] == tipo].tail(2)
+        if len(ultimos) < 2:
+            continue
+        anterior, actual = ultimos.iloc[0], ultimos.iloc[1]
+        regla = reglas.get(actual["etiqueta"])
+        if regla is None:
+            continue
+        nombre, cumple = regla
+        cambio_macd = linea_macd.get(actual["fecha"]) - linea_macd.get(anterior["fecha"])
+        if cumple(cambio_macd):
+            resultado.append(f"{nombre} ({anterior['fecha']:%d-%m} a {actual['fecha']:%d-%m})")
+    return resultado
+
+
+def resumen_macd(cierres: pd.Series, giros: pd.DataFrame) -> dict:
+    """MACD, señal e histograma de hoy; impulso según el último cruce MACD/señal;
+    posición respecto de cero; si el histograma mejora o empeora en la última
+    semana; y divergencias en los últimos giros."""
+    linea, senal, histograma = macd(cierres)
+    alcista = linea > senal
+    cambios = alcista[alcista != alcista.shift()].index[1:]
+    return {
+        "macd": linea.iloc[-1],
+        "senal": senal.iloc[-1],
+        "histograma": histograma.iloc[-1],
+        "histograma_mejora": histograma.iloc[-1] > histograma.iloc[-1 - DIAS_PENDIENTE_HISTOGRAMA],
+        "impulso": "Alcista" if alcista.iloc[-1] else "Bajista",
+        "desde": cambios[-1] if len(cambios) else None,
+        "sobre_cero": linea.iloc[-1] > 0,
+        "divergencias": divergencias(giros, linea),
+    }

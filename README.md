@@ -109,6 +109,9 @@ Además, en el orden en que se lee un análisis técnico:
 3. **DMI (+DI y −DI, 14 días, suavizado de Wilder como TradingView)**: dirección alcista si +DI > −DI, bajista si −DI > +DI, con la fecha del último cruce.
 4. **ADX (14 días)**: potencia de la tendencia, sin importar la dirección. Menos de 20, sin tendencia; 20 a 25, débil; 25 a 40, fuerte; más de 40, muy fuerte. ▲/▼ indica si subió o bajó respecto de hace 5 días hábiles.
 
+5. **MACD (12, 26, 9)**: línea MACD (media exponencial de 12 días − la de 26), señal (media exponencial de 9 días de la MACD) e histograma (MACD − señal). Impulso alcista si MACD > señal y bajista si MACD < señal, con la fecha del último cruce; si la MACD está sobre o bajo cero; y si el histograma subió (▲) o bajó (▼) respecto de hace 5 días hábiles.
+   - **Divergencias**: compara el precio y la MACD en los dos últimos máximos y en los dos últimos mínimos de la estructura. Clásica bajista: precio HH y MACD más baja. Clásica alcista: precio LL y MACD más alta. Oculta bajista: precio LH y MACD más alta. Oculta alcista: precio HL y MACD más baja. Si no hay ninguna, muestra "No".
+
 Para la media de 200 y el ADX se descargan al menos 15 meses de precios; la estructura usa solo los meses pedidos. Es una sola descarga por activo. Por ahora el análisis técnico se muestra solo en pantalla, no en la presentación.
 
 ## Presentación

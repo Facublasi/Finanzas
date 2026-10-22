@@ -273,6 +273,24 @@ def _tabla_dmi(estructura: dict) -> pd.DataFrame:
     return pd.DataFrame.from_dict(filas, orient="index")
 
 
+def _tabla_macd(estructura: dict) -> pd.DataFrame:
+    """Una fila por activo: MACD, señal, histograma, impulso y divergencias."""
+    filas = {}
+    for ticker, r in estructura.items():
+        if r is None:
+            continue
+        m = r["macd"]
+        filas[ticker] = {
+            "MACD": f"{m['macd']:.2f}",
+            "Señal": f"{m['senal']:.2f}",
+            "Histograma": f"{m['histograma']:.2f} {'▲' if m['histograma_mejora'] else '▼'}",
+            "Cero": "Sobre" if m["sobre_cero"] else "Bajo",
+            "Impulso": m["impulso"] + (f" desde {m['desde']:%d-%m-%Y}" if m["desde"] is not None else ""),
+            "Divergencias": "; ".join(m["divergencias"]) or "No",
+        }
+    return pd.DataFrame.from_dict(filas, orient="index")
+
+
 def mostrar_estructura(estructura: dict, meses: int):
     """Análisis técnico en el orden de lectura: estructura (dirección),
     medias móviles (confirmación), DI (quién domina) y ADX (potencia)."""
@@ -297,6 +315,15 @@ def mostrar_estructura(estructura: dict, meses: int):
         print("\n  Dirección: alcista si +DI > −DI, bajista si −DI > +DI, desde el último cruce. Potencia según el"
               " ADX: menos de 20 sin tendencia, 20 a 25 débil, 25 a 40 fuerte, más de 40 muy fuerte."
               " ▲/▼: el ADX subió o bajó en la última semana.")
+    tabla_macd = _tabla_macd(estructura)
+    if not tabla_macd.empty:
+        print("\n5) MACD (12, 26, 9)")
+        print(tabla_macd.to_string())
+        print("\n  Impulso: alcista si MACD > señal, bajista si MACD < señal, desde el último cruce. Cero: si la"
+              " MACD está sobre o bajo cero. ▲/▼: el histograma subió o bajó en la última semana."
+              " Divergencias, en los dos últimos máximos y mínimos de la estructura: clásica bajista (precio HH,"
+              " MACD más bajo), clásica alcista (precio LL, MACD más alto), oculta bajista (precio LH, MACD más"
+              " alto) y oculta alcista (precio HL, MACD más bajo).")
 
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ from presentacion import (
     generar_reporte, mostrar_analistas, mostrar_cartera, mostrar_comparativa, mostrar_detalle,
     mostrar_estructura,
 )
-from tecnicos import estructura_mercado, medias_moviles, quiebre, resumen_dmi
+from tecnicos import estructura_mercado, medias_moviles, quiebre, resumen_dmi, resumen_macd
 
 # Tasa libre de riesgo: rendimiento anual (en %) de la Letra del Tesoro de
 # EE.UU. a 13 semanas.
@@ -291,6 +291,7 @@ def analizar_tecnico(tickers: list, fin: date, meses: int) -> dict:
             "quiebre": quiebre(estructura, precio),
             "medias": medias_moviles(precios["Close"]),
             "dmi": resumen_dmi(precios["High"], precios["Low"], precios["Close"]),
+            "macd": resumen_macd(precios["Close"], estructura["giros"]),
         }
     return resultados
 

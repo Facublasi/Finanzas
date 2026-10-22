@@ -6,11 +6,12 @@ Trabajo práctico de finanzas (análisis de activos y carteras con yfinance). El
 
 - `src/cotizaciones.py`: programa principal (se corre con `python src/cotizaciones.py`). Pide los datos, descarga precios y muestra resultados.
 - `src/metricas.py`: solo las fórmulas (retornos, volatilidad, Sharpe, cartera).
+- `src/tecnicos.py`: solo los cálculos de análisis técnico (hoy, la estructura de mercado).
 - `src/presentacion.py`: todo lo que se muestra. Las tablas de la pantalla y la presentación con la estética de Tu Asesoría Financiera (`reportes/reporte.html` y `reportes/reporte.pdf`).
 - `src/assets/`: logo, tipografías (Cinzel, EB Garamond, Lato) y `plantilla.html` (estilos de la presentación).
 - `README.md`: describe el uso y los cálculos; mantenerlo actualizado con cada cambio.
 
-Es un único programa en tres archivos: datos (`cotizaciones.py`), cálculos (`metricas.py`) y presentación (`presentacion.py`). Mantener esa separación.
+Es un único programa en cuatro archivos: datos (`cotizaciones.py`), cálculos (`metricas.py`), análisis técnico (`tecnicos.py`) y presentación (`presentacion.py`). Mantener esa separación.
 
 ## Qué hace hoy
 
@@ -21,7 +22,8 @@ Es un único programa en tres archivos: datos (`cotizaciones.py`), cálculos (`m
 5. Por activo: retorno logarítmico, retorno anualizado, volatilidad anualizada y Sharpe.
 6. Cartera: retorno esperado `Σ w·E(R)`, volatilidad `√(wᵀΣw)`, Sharpe, matrices de covarianzas y correlaciones.
 7. Opcional: proyecciones de analistas de Yahoo (promedio y rango del precio objetivo actual, igual que Yahoo Finance; tendencia del consenso en 3 meses; precisión de los objetivos publicados entre hace 36 y 12 meses, uno por banco por trimestre (cumplidos y tocados, por activo y por banco); consenso de hace 36, 24 y 12 meses contra la suba real de los 12 meses siguientes, sin ventanas superpuestas, y suba real anualizada; objetivo implícito de los ETF por sus 10 principales tenencias). Los objetivos anteriores a un split se dividen por su proporción.
-8. Guarda una presentación tipo diapositivas (16:9) en HTML y PDF con la marca Tu Asesoría Financiera: paleta azul marino, dorado y crema; logo y datos de contacto. El PDF se genera con Playwright (Chromium); si no está, queda solo el HTML.
+8. Opcional: estructura de mercado con precios diarios del último año (sin ajustar por dividendos, como TradingView). Giros: máximo o mínimo de 5 días hábiles a cada lado. Clasificación HH/LH/EH y HL/LL/EL con 1% de tolerancia. Tendencia: alcista (HH y HL), bajista (LH y LL), rango (EH o EL) o transición (mezcla).
+9. Guarda una presentación tipo diapositivas (16:9) en HTML y PDF con la marca Tu Asesoría Financiera: paleta azul marino, dorado y crema; logo y datos de contacto. El PDF se genera con Playwright (Chromium); si no está, queda solo el HTML.
 
 ## Decisiones tomadas (no cambiar sin que el usuario lo pida)
 

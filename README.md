@@ -29,6 +29,7 @@ Frecuencia:
   3) Mensual
 Elegí una opción [1]: 3
 ¿Analizar proyecciones de analistas? (s/n) [n]: s
+¿Analizar estructura de mercado? (s/n) [n]: s
 ```
 
 - Cada activo se escribe con su peso en la cartera, en %, separados por coma. Los pesos tienen que ser mayores a 0 y sumar 100%; si no, el programa avisa y vuelve a preguntar. Para decimales se usa punto (ej: `AAPL 33.33`).
@@ -91,6 +92,16 @@ Los ETF no tienen analistas propios. Para ellos se calcula un **objetivo implíc
 
 Yahoo limita las consultas cuando son muchas seguidas: el programa reintenta y, si no lo logra, avisa qué activo quedó sin datos.
 
+## Estructura de mercado
+
+Si respondés `s` a la pregunta de estructura de mercado, el programa descarga los precios diarios del último año de cada activo (hasta la fecha de fin) e identifica la tendencia según sus máximos y mínimos (`src/tecnicos.py`):
+
+1. **Giros**: un día es un máximo relevante si su precio máximo es el más alto de los 5 días hábiles anteriores y los 5 posteriores; lo mismo para los mínimos. Es el mismo criterio que el indicador "Pivots High/Low" de TradingView. Los precios no se ajustan por dividendos (solo por splits), igual que los gráficos de TradingView.
+2. **Clasificación**: cada máximo se compara con el máximo anterior: **HH** (más alto), **LH** (más bajo) o **EH** (igual, con una tolerancia de 1%). Cada mínimo, con el mínimo anterior: **HL**, **LL** o **EL**.
+3. **Tendencia**, según el último máximo y el último mínimo: **Alcista** (HH y HL), **Bajista** (LH y LL), **Rango** (alguno es EH o EL) o **Transición** (señales mezcladas, por ejemplo HH con LL).
+
+La tabla muestra también el precio actual, el último máximo y mínimo con su fecha, y la secuencia de las últimas etiquetas. Un giro recién se confirma 5 días después: el precio actual puede estar lejos del último giro.
+
 ## Presentación
 
 Además de mostrar los resultados en pantalla, el programa guarda una presentación con la estética de Tu Asesoría Financiera en la carpeta `reportes/`:
@@ -106,7 +117,7 @@ Cada vez que se corre el programa, los dos archivos se reemplazan. Las diapositi
 4. **Evolución de precios**: gráfico de cada activo con los precios llevados a 100 al inicio del período.
 5. **Riesgo, retorno y Sharpe**: gráfico de volatilidad contra retorno y barras con el Sharpe de cada activo y de la cartera.
 6. **Correlaciones**: mapa de calor con la mitad de abajo de la matriz (es simétrica y la diagonal siempre vale 1). Usa su propia escala de colores: rojo para −1, amarillo para 0 y verde para 1. La matriz de covarianzas se muestra solo en pantalla.
-7. **Analistas** (solo si se pidió): la tabla de proyecciones por activo, el consenso contra la realidad a 12 meses y los 4 bancos con más objetivos evaluados.
+7. **Analistas** y **Estructura de mercado** (solo si se pidieron): la tabla de proyecciones por activo, el consenso contra la realidad a 12 meses y los 4 bancos con más objetivos evaluados.
 8. **Metodología**: cómo se calcula cada métrica, y los datos de contacto.
 
 Con un solo activo no se incluyen las diapositivas 5 y 6. Los valores son los mismos que se muestran en pantalla, con el mismo redondeo.

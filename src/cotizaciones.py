@@ -13,7 +13,9 @@ from metricas import (
 )
 from presentacion import (
     generar_reporte, mostrar_analistas, mostrar_cartera, mostrar_comparativa, mostrar_detalle,
+    mostrar_estructura,
 )
+from tecnicos import estructura_mercado
 
 # Tasa libre de riesgo: rendimiento anual (en %) de la Letra del Tesoro de
 # EE.UU. a 13 semanas.
@@ -251,6 +253,21 @@ def _analizar_activo(ticker: str, hoy: date) -> dict:
     }
 
 
+def analizar_estructura(tickers: list, fin: date) -> dict:
+    """Estructura de mercado de cada activo con precios diarios del último año
+    hasta `fin`. Los precios no se ajustan por dividendos (solo por splits),
+    igual que los gráficos de TradingView."""
+    resultados = {}
+    for ticker in tickers:
+        precios = _con_reintentos(lambda: yf.Ticker(ticker).history(
+            start=fin - timedelta(days=372), end=fin + timedelta(days=1), auto_adjust=False))
+        if precios is None:
+            resultados[ticker] = None
+            continue
+        resultados[ticker] = {**estructura_mercado(precios), "precio": float(precios["Close"].iloc[-1])}
+    return resultados
+
+
 def main():
     hoy = date.today()
     cartera = pedir_cartera()
@@ -262,6 +279,7 @@ def main():
         print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
     intervalo = pedir_frecuencia()
     con_analistas = pedir_texto("¿Analizar proyecciones de analistas? (s/n)", "n").lower().startswith("s")
+    con_estructura = pedir_texto("¿Analizar estructura de mercado? (s/n)", "n").lower().startswith("s")
 
     print()
     validos = descargar_validos(list(cartera), inicio, fin, intervalo)
@@ -295,8 +313,14 @@ def main():
         analistas = analizar_analistas(list(cartera), hoy)
         mostrar_analistas(analistas)
 
+    estructura = None
+    if con_estructura:
+        print("\nDescargando precios diarios para la estructura de mercado...")
+        estructura = analizar_estructura(list(cartera), fin)
+        mostrar_estructura(estructura)
+
     generar_reporte(CARPETA_REPORTES, cartera, inicio, fin, intervalo, tasa_libre_riesgo, TICKER_TASA,
-                    resumenes, datos_cartera, precios, analistas)
+                    resumenes, datos_cartera, precios, analistas, estructura)
 
 
 if __name__ == "__main__":

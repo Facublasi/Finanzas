@@ -201,6 +201,67 @@ def mostrar_analistas(analistas: dict):
         ))
 
 
+_NOTA_ESTRUCTURA = (
+    "Giros: un máximo (o mínimo) es relevante si es el más alto (o más bajo) de los 5 días hábiles anteriores y "
+    "posteriores, con precios diarios del último año. Cada máximo se compara con el anterior (HH más alto, LH más "
+    "bajo, EH igual con 1% de tolerancia) y cada mínimo también (HL, LL, EL). Alcista: último máximo HH y último "
+    "mínimo HL. Bajista: LH y LL. Rango: alguno es EH o EL. Transición: señales mezcladas. Los giros se confirman "
+    "5 días después."
+)
+
+
+def _tabla_estructura(estructura: dict) -> pd.DataFrame:
+    """Una fila por activo: tendencia, último máximo y mínimo, y secuencia."""
+    def giro(g):
+        return f"{g['etiqueta']} {g['precio']:.2f} ({g['fecha']:%d-%m-%Y})" if g else None
+    filas = {}
+    for ticker, r in estructura.items():
+        if r is None:
+            filas[ticker] = {"Tendencia": "Sin datos"}
+            continue
+        filas[ticker] = {
+            "Tendencia": r["tendencia"],
+            "Precio actual": r["precio"],
+            "Último máximo": giro(r["ultimo_maximo"]),
+            "Último mínimo": giro(r["ultimo_minimo"]),
+            "Secuencia": " → ".join(r["secuencia"]) or None,
+        }
+    columnas = ["Tendencia", "Precio actual", "Último máximo", "Último mínimo", "Secuencia"]
+    return pd.DataFrame.from_dict(filas, orient="index").reindex(columns=columnas)
+
+
+def mostrar_estructura(estructura: dict):
+    """Tendencia de cada activo según su estructura de máximos y mínimos."""
+    print("\nEstructura de mercado (diaria)")
+    print(_tabla_estructura(estructura).to_string(
+        na_rep="—", formatters={"Precio actual": lambda v: "—" if pd.isna(v) else f"{v:.2f}"}))
+    print("\n  " + _NOTA_ESTRUCTURA)
+    for ticker, r in estructura.items():
+        if r is None:
+            print(f"  Aviso: Yahoo no devolvió los precios diarios de {ticker}. Probá de nuevo en unos minutos.")
+
+
+def _estructura_html(estructura: dict) -> str:
+    """Tabla de estructura de mercado por activo."""
+    tabla = _tabla_estructura(estructura)
+    clases = {"Alcista": "sube", "Bajista": "baja"}
+    filas = "".join(
+        f'<tr><td class="tk">{html.escape(t)}</td>'
+        f'<td class="{clases.get(f["Tendencia"], "")}"><b>{html.escape(str(f["Tendencia"]))}</b></td>'
+        + (f'<td class="r">{f["Precio actual"]:.2f}</td>' if not pd.isna(f["Precio actual"]) else '<td class="r">—</td>')
+        + "".join(f'<td>{html.escape(str(f[c])) if isinstance(f[c], str) else "—"}</td>'
+                  for c in ["Último máximo", "Último mínimo", "Secuencia"])
+        + "</tr>"
+        for t, f in tabla.iterrows()
+    )
+    return f"""
+<table>
+  <thead><tr><th>Activo</th><th>Tendencia</th><th class="r">Precio actual</th><th>Último máximo</th><th>Último mínimo</th><th>Secuencia</th></tr></thead>
+  <tbody>{filas}</tbody>
+</table>
+<div class="note">{html.escape(_NOTA_ESTRUCTURA)}</div>"""
+
+
 # ---------------------------------------------------------------------------
 # Gráficos (imágenes PNG con la paleta y la tipografía de la marca)
 # ---------------------------------------------------------------------------
@@ -449,14 +510,14 @@ def _analistas_html(analistas: dict) -> str:
 
 
 def armar_html(cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa,
-               resumenes, c, precios, analistas=None) -> str:
+               resumenes, c, precios, analistas=None, estructura=None) -> str:
     """Arma la presentación completa como un único archivo HTML."""
     _preparar_matplotlib()
     tickers = [html.escape(t) for t in cartera]
     periodo = f"{inicio:%d-%m-%Y} al {fin:%d-%m-%Y}"
     frecuencia = NOMBRES_FRECUENCIA[intervalo]
     varios = len(cartera) > 1
-    total = (7 if varios else 5) + (1 if analistas else 0)
+    total = (7 if varios else 5) + (1 if analistas else 0) + (1 if estructura else 0)
 
     # 1. Portada
     portada = f"""
@@ -570,6 +631,8 @@ Para la cartera no se calcula un retorno total.</div>"""
         diapositivas.append(("Diversificación", "Matriz de correlaciones", correl_html))
     if analistas:
         diapositivas.append(("Analistas", "Proyecciones y precisión", _analistas_html(analistas)))
+    if estructura:
+        diapositivas.append(("Análisis técnico", "Estructura de mercado", _estructura_html(estructura)))
     diapositivas.append(("Metodología", "Cómo se calcula", metodo_html))
 
     cuerpo = portada + "".join(
@@ -606,14 +669,14 @@ def guardar_pdf(ruta_html: Path, ruta_pdf: Path) -> bool:
 
 
 def generar_reporte(carpeta: Path, cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa,
-                    resumenes, c, precios, analistas=None):
+                    resumenes, c, precios, analistas=None, estructura=None):
     """Guarda la presentación como reporte.html y reporte.pdf en `carpeta`."""
     carpeta.mkdir(parents=True, exist_ok=True)
     ruta_html = carpeta / "reporte.html"
     ruta_pdf = carpeta / "reporte.pdf"
     ruta_html.write_text(
         armar_html(cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa, resumenes, c, precios,
-                   analistas),
+                   analistas, estructura),
         encoding="utf-8",
     )
     print(f"\nPresentación guardada en {ruta_html}")

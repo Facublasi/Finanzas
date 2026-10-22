@@ -241,27 +241,6 @@ def mostrar_estructura(estructura: dict):
             print(f"  Aviso: Yahoo no devolvió los precios diarios de {ticker}. Probá de nuevo en unos minutos.")
 
 
-def _estructura_html(estructura: dict) -> str:
-    """Tabla de estructura de mercado por activo."""
-    tabla = _tabla_estructura(estructura)
-    clases = {"Alcista": "sube", "Bajista": "baja"}
-    filas = "".join(
-        f'<tr><td class="tk">{html.escape(t)}</td>'
-        f'<td class="{clases.get(f["Tendencia"], "")}"><b>{html.escape(str(f["Tendencia"]))}</b></td>'
-        + (f'<td class="r">{f["Precio actual"]:.2f}</td>' if not pd.isna(f["Precio actual"]) else '<td class="r">—</td>')
-        + "".join(f'<td>{html.escape(str(f[c])) if isinstance(f[c], str) else "—"}</td>'
-                  for c in ["Último máximo", "Último mínimo", "Secuencia"])
-        + "</tr>"
-        for t, f in tabla.iterrows()
-    )
-    return f"""
-<table>
-  <thead><tr><th>Activo</th><th>Tendencia</th><th class="r">Precio actual</th><th>Último máximo</th><th>Último mínimo</th><th>Secuencia</th></tr></thead>
-  <tbody>{filas}</tbody>
-</table>
-<div class="note">{html.escape(_NOTA_ESTRUCTURA)}</div>"""
-
-
 # ---------------------------------------------------------------------------
 # Gráficos (imágenes PNG con la paleta y la tipografía de la marca)
 # ---------------------------------------------------------------------------
@@ -510,14 +489,14 @@ def _analistas_html(analistas: dict) -> str:
 
 
 def armar_html(cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa,
-               resumenes, c, precios, analistas=None, estructura=None) -> str:
+               resumenes, c, precios, analistas=None) -> str:
     """Arma la presentación completa como un único archivo HTML."""
     _preparar_matplotlib()
     tickers = [html.escape(t) for t in cartera]
     periodo = f"{inicio:%d-%m-%Y} al {fin:%d-%m-%Y}"
     frecuencia = NOMBRES_FRECUENCIA[intervalo]
     varios = len(cartera) > 1
-    total = (7 if varios else 5) + (1 if analistas else 0) + (1 if estructura else 0)
+    total = (7 if varios else 5) + (1 if analistas else 0)
 
     # 1. Portada
     portada = f"""
@@ -631,8 +610,6 @@ Para la cartera no se calcula un retorno total.</div>"""
         diapositivas.append(("Diversificación", "Matriz de correlaciones", correl_html))
     if analistas:
         diapositivas.append(("Analistas", "Proyecciones y precisión", _analistas_html(analistas)))
-    if estructura:
-        diapositivas.append(("Análisis técnico", "Estructura de mercado", _estructura_html(estructura)))
     diapositivas.append(("Metodología", "Cómo se calcula", metodo_html))
 
     cuerpo = portada + "".join(
@@ -669,14 +646,14 @@ def guardar_pdf(ruta_html: Path, ruta_pdf: Path) -> bool:
 
 
 def generar_reporte(carpeta: Path, cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa,
-                    resumenes, c, precios, analistas=None, estructura=None):
+                    resumenes, c, precios, analistas=None):
     """Guarda la presentación como reporte.html y reporte.pdf en `carpeta`."""
     carpeta.mkdir(parents=True, exist_ok=True)
     ruta_html = carpeta / "reporte.html"
     ruta_pdf = carpeta / "reporte.pdf"
     ruta_html.write_text(
         armar_html(cartera, inicio, fin, intervalo, tasa_libre_riesgo, ticker_tasa, resumenes, c, precios,
-                   analistas, estructura),
+                   analistas),
         encoding="utf-8",
     )
     print(f"\nPresentación guardada en {ruta_html}")

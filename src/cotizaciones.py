@@ -320,7 +320,7 @@ def main():
         mostrar_estructura(estructura)
 
     generar_reporte(CARPETA_REPORTES, cartera, inicio, fin, intervalo, tasa_libre_riesgo, TICKER_TASA,
-                    resumenes, datos_cartera, precios, analistas, estructura)
+                    resumenes, datos_cartera, precios, analistas)
 
 
 if __name__ == "__main__":

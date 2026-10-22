@@ -30,6 +30,7 @@ Frecuencia:
 Elegí una opción [1]: 3
 ¿Analizar proyecciones de analistas? (s/n) [n]: s
 ¿Analizar estructura de mercado? (s/n) [n]: s
+Meses a analizar para la estructura (hasta la fecha de fin) [12]: 12
 ```
 
 - Cada activo se escribe con su peso en la cartera, en %, separados por coma. Los pesos tienen que ser mayores a 0 y sumar 100%; si no, el programa avisa y vuelve a preguntar. Para decimales se usa punto (ej: `AAPL 33.33`).
@@ -94,7 +95,7 @@ Yahoo limita las consultas cuando son muchas seguidas: el programa reintenta y, 
 
 ## Estructura de mercado
 
-Si respondés `s` a la pregunta de estructura de mercado, el programa descarga los precios diarios del último año de cada activo (hasta la fecha de fin) e identifica la tendencia según sus máximos y mínimos (`src/tecnicos.py`):
+Si respondés `s` a la pregunta de estructura de mercado, el programa pregunta cuántos meses analizar (entre 2 y 60; 12 si se deja vacío) y descarga los precios diarios de ese período de cada activo, hasta la fecha de fin, e identifica la tendencia según sus máximos y mínimos (`src/tecnicos.py`):
 
 1. **Giros**: un día es un máximo relevante si su precio máximo es el más alto de los 5 días hábiles anteriores y los 5 posteriores; lo mismo para los mínimos. Es el mismo criterio que el indicador "Pivots High/Low" de TradingView. Los precios no se ajustan por dividendos (solo por splits), igual que los gráficos de TradingView.
 2. **Clasificación**: cada máximo se compara con el máximo anterior: **HH** (más alto), **LH** (más bajo) o **EH** (igual, con una tolerancia de 1%). Cada mínimo, con el mínimo anterior: **HL**, **LL** o **EL**.

@@ -253,14 +253,24 @@ def _analizar_activo(ticker: str, hoy: date) -> dict:
     }
 
 
-def analizar_estructura(tickers: list, fin: date) -> dict:
-    """Estructura de mercado de cada activo con precios diarios del último año
-    hasta `fin`. Los precios no se ajustan por dividendos (solo por splits),
-    igual que los gráficos de TradingView."""
+def pedir_meses(mensaje: str, defecto: int, minimo: int = 2, maximo: int = 60) -> int:
+    """Pide una cantidad de meses entera entre `minimo` y `maximo`."""
+    while True:
+        valor = pedir_texto(mensaje, str(defecto))
+        if valor.isdigit() and minimo <= int(valor) <= maximo:
+            return int(valor)
+        print(f"  Ingresá un número entero de meses entre {minimo} y {maximo}.")
+
+
+def analizar_estructura(tickers: list, fin: date, meses: int) -> dict:
+    """Estructura de mercado de cada activo con precios diarios de los últimos
+    `meses` meses hasta `fin`. Los precios no se ajustan por dividendos (solo
+    por splits), igual que los gráficos de TradingView."""
+    inicio = (pd.Timestamp(fin) - pd.DateOffset(months=meses)).date()
     resultados = {}
     for ticker in tickers:
         precios = _con_reintentos(lambda: yf.Ticker(ticker).history(
-            start=fin - timedelta(days=372), end=fin + timedelta(days=1), auto_adjust=False))
+            start=inicio, end=fin + timedelta(days=1), auto_adjust=False))
         if precios is None:
             resultados[ticker] = None
             continue
@@ -280,6 +290,8 @@ def main():
     intervalo = pedir_frecuencia()
     con_analistas = pedir_texto("¿Analizar proyecciones de analistas? (s/n)", "n").lower().startswith("s")
     con_estructura = pedir_texto("¿Analizar estructura de mercado? (s/n)", "n").lower().startswith("s")
+    if con_estructura:
+        meses_estructura = pedir_meses("Meses a analizar para la estructura (hasta la fecha de fin)", 12)
 
     print()
     validos = descargar_validos(list(cartera), inicio, fin, intervalo)
@@ -316,8 +328,8 @@ def main():
     estructura = None
     if con_estructura:
         print("\nDescargando precios diarios para la estructura de mercado...")
-        estructura = analizar_estructura(list(cartera), fin)
-        mostrar_estructura(estructura)
+        estructura = analizar_estructura(list(cartera), fin, meses_estructura)
+        mostrar_estructura(estructura, meses_estructura)
 
     generar_reporte(CARPETA_REPORTES, cartera, inicio, fin, intervalo, tasa_libre_riesgo, TICKER_TASA,
                     resumenes, datos_cartera, precios, analistas)

@@ -203,7 +203,7 @@ def mostrar_analistas(analistas: dict):
 
 _NOTA_ESTRUCTURA = (
     "Giros: un máximo (o mínimo) es relevante si es el más alto (o más bajo) de los 5 días hábiles anteriores y "
-    "posteriores, con precios diarios del último año. Cada máximo se compara con el anterior (HH más alto, LH más "
+    "posteriores, con precios diarios de los últimos {meses} meses. Cada máximo se compara con el anterior (HH más alto, LH más "
     "bajo, EH igual con 1% de tolerancia) y cada mínimo también (HL, LL, EL). Alcista: último máximo HH y último "
     "mínimo HL. Bajista: LH y LL. Rango: alguno es EH o EL. Transición: señales mezcladas. Los giros se confirman "
     "5 días después."
@@ -230,12 +230,12 @@ def _tabla_estructura(estructura: dict) -> pd.DataFrame:
     return pd.DataFrame.from_dict(filas, orient="index").reindex(columns=columnas)
 
 
-def mostrar_estructura(estructura: dict):
+def mostrar_estructura(estructura: dict, meses: int):
     """Tendencia de cada activo según su estructura de máximos y mínimos."""
-    print("\nEstructura de mercado (diaria)")
+    print(f"\nEstructura de mercado (diaria, últimos {meses} meses)")
     print(_tabla_estructura(estructura).to_string(
         na_rep="—", formatters={"Precio actual": lambda v: "—" if pd.isna(v) else f"{v:.2f}"}))
-    print("\n  " + _NOTA_ESTRUCTURA)
+    print("\n  " + _NOTA_ESTRUCTURA.format(meses=meses))
     for ticker, r in estructura.items():
         if r is None:
             print(f"  Aviso: Yahoo no devolvió los precios diarios de {ticker}. Probá de nuevo en unos minutos.")

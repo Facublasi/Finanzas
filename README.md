@@ -29,7 +29,7 @@ Frecuencia:
   3) Mensual
 Elegí una opción [1]: 3
 ¿Analizar proyecciones de analistas? (s/n) [n]: s
-¿Analizar estructura de mercado? (s/n) [n]: s
+¿Hacer el análisis técnico? (s/n) [n]: s
 Meses a analizar para la estructura (hasta la fecha de fin) [12]: 12
 ```
 
@@ -95,13 +95,21 @@ Yahoo limita las consultas cuando son muchas seguidas: el programa reintenta y, 
 
 ## Estructura de mercado
 
-Si respondés `s` a la pregunta de estructura de mercado, el programa pregunta cuántos meses analizar (entre 2 y 60; 12 si se deja vacío) y descarga los precios diarios de ese período de cada activo, hasta la fecha de fin, e identifica la tendencia según sus máximos y mínimos (`src/tecnicos.py`):
+Si respondés `s` a la pregunta del análisis técnico, el programa pregunta cuántos meses analizar (entre 2 y 60; 12 si se deja vacío) y descarga los precios diarios de ese período de cada activo, hasta la fecha de fin, e identifica la tendencia según sus máximos y mínimos (`src/tecnicos.py`):
 
 1. **Giros**: un día es un máximo relevante si su precio máximo es el más alto de los 5 días hábiles anteriores y los 5 posteriores; lo mismo para los mínimos. Es el mismo criterio que el indicador "Pivots High/Low" de TradingView. Los precios no se ajustan por dividendos (solo por splits), igual que los gráficos de TradingView.
 2. **Clasificación**: cada máximo se compara con el máximo anterior: **HH** (más alto), **LH** (más bajo) o **EH** (igual, con una tolerancia de 1%). Cada mínimo, con el mínimo anterior: **HL**, **LL** o **EL**.
 3. **Tendencia**, según el último máximo y el último mínimo: **Alcista** (HH y HL), **Bajista** (LH y LL), **Rango** (alguno es EH o EL) o **Transición** (señales mezcladas, por ejemplo HH con LL).
 
-La tabla muestra también el precio actual, el último máximo y mínimo con su fecha, y la secuencia de las últimas etiquetas. Un giro recién se confirma 5 días después: el precio actual puede estar lejos del último giro. Por ahora se muestra solo en pantalla, no en la presentación.
+La tabla muestra también el precio actual, el último máximo y mínimo con su fecha, la secuencia de las últimas etiquetas y el **quiebre de estructura**: si el precio actual ya perforó el último mínimo o superó el último máximo confirmado. Un giro recién se confirma 5 días después, y el quiebre avisa antes.
+
+Además, en el orden en que se lee un análisis técnico:
+
+2. **Medias móviles simples de 9, 21, 50 y 200 días**: si el precio está por encima (▲) o por debajo (▼) de cada una; alineación alcista (MM9 > MM21 > MM50 > MM200), bajista (al revés) o mezclada; y el último cruce de la de 50 con la de 200 (dorado si la de 50 pasa por encima, de la muerte si pasa por debajo). Los cruces se buscan desde el primer día en que existen las dos medias.
+3. **DMI (+DI y −DI, 14 días, suavizado de Wilder como TradingView)**: dirección alcista si +DI > −DI, bajista si −DI > +DI, con la fecha del último cruce.
+4. **ADX (14 días)**: potencia de la tendencia, sin importar la dirección. Menos de 20, sin tendencia; 20 a 25, débil; 25 a 40, fuerte; más de 40, muy fuerte. ▲/▼ indica si subió o bajó respecto de hace 5 días hábiles.
+
+Para la media de 200 y el ADX se descargan al menos 15 meses de precios; la estructura usa solo los meses pedidos. Es una sola descarga por activo. Por ahora el análisis técnico se muestra solo en pantalla, no en la presentación.
 
 ## Presentación
 

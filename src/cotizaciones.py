@@ -15,7 +15,7 @@ from presentacion import (
     generar_reporte, mostrar_analistas, mostrar_cartera, mostrar_comparativa, mostrar_detalle,
     mostrar_estructura,
 )
-from tecnicos import estructura_mercado
+from tecnicos import estructura_mercado, medias_moviles, quiebre, resumen_dmi
 
 # Tasa libre de riesgo: rendimiento anual (en %) de la Letra del Tesoro de
 # EE.UU. a 13 semanas.
@@ -262,11 +262,18 @@ def pedir_meses(mensaje: str, defecto: int, minimo: int = 2, maximo: int = 60) -
         print(f"  Ingresá un número entero de meses entre {minimo} y {maximo}.")
 
 
-def analizar_estructura(tickers: list, fin: date, meses: int) -> dict:
-    """Estructura de mercado de cada activo con precios diarios de los últimos
-    `meses` meses hasta `fin`. Los precios no se ajustan por dividendos (solo
-    por splits), igual que los gráficos de TradingView."""
-    inicio = (pd.Timestamp(fin) - pd.DateOffset(months=meses)).date()
+# Meses mínimos de precios para el análisis técnico: la media de 200 días y el
+# suavizado del ADX necesitan unos 10 meses de historia previa.
+MESES_MINIMOS_TECNICO = 15
+
+
+def analizar_tecnico(tickers: list, fin: date, meses: int) -> dict:
+    """Estructura de mercado (últimos `meses` meses), quiebre de estructura,
+    medias móviles y DMI-ADX de cada activo, con precios diarios hasta `fin`.
+    Los precios no se ajustan por dividendos (solo por splits), igual que los
+    gráficos de TradingView. Una sola descarga por activo."""
+    fin_ts = pd.Timestamp(fin)
+    inicio = (fin_ts - pd.DateOffset(months=max(meses, MESES_MINIMOS_TECNICO))).date()
     resultados = {}
     for ticker in tickers:
         precios = _con_reintentos(lambda: yf.Ticker(ticker).history(
@@ -274,7 +281,17 @@ def analizar_estructura(tickers: list, fin: date, meses: int) -> dict:
         if precios is None:
             resultados[ticker] = None
             continue
-        resultados[ticker] = {**estructura_mercado(precios), "precio": float(precios["Close"].iloc[-1])}
+        precios.index = precios.index.tz_localize(None)
+        periodo = precios[precios.index >= fin_ts - pd.DateOffset(months=meses)]
+        estructura = estructura_mercado(periodo)
+        precio = float(precios["Close"].iloc[-1])
+        resultados[ticker] = {
+            **estructura,
+            "precio": precio,
+            "quiebre": quiebre(estructura, precio),
+            "medias": medias_moviles(precios["Close"]),
+            "dmi": resumen_dmi(precios["High"], precios["Low"], precios["Close"]),
+        }
     return resultados
 
 
@@ -289,7 +306,7 @@ def main():
         print("  La fecha de inicio tiene que ser anterior o igual a la de fin.")
     intervalo = pedir_frecuencia()
     con_analistas = pedir_texto("¿Analizar proyecciones de analistas? (s/n)", "n").lower().startswith("s")
-    con_estructura = pedir_texto("¿Analizar estructura de mercado? (s/n)", "n").lower().startswith("s")
+    con_estructura = pedir_texto("¿Hacer el análisis técnico? (s/n)", "n").lower().startswith("s")
     if con_estructura:
         meses_estructura = pedir_meses("Meses a analizar para la estructura (hasta la fecha de fin)", 12)
 
@@ -327,8 +344,8 @@ def main():
 
     estructura = None
     if con_estructura:
-        print("\nDescargando precios diarios para la estructura de mercado...")
-        estructura = analizar_estructura(list(cartera), fin, meses_estructura)
+        print("\nDescargando precios diarios para el análisis técnico...")
+        estructura = analizar_tecnico(list(cartera), fin, meses_estructura)
         mostrar_estructura(estructura, meses_estructura)
 
     generar_reporte(CARPETA_REPORTES, cartera, inicio, fin, intervalo, tasa_libre_riesgo, TICKER_TASA,

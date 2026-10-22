@@ -211,7 +211,7 @@ _NOTA_ESTRUCTURA = (
 
 
 def _tabla_estructura(estructura: dict) -> pd.DataFrame:
-    """Una fila por activo: tendencia, último máximo y mínimo, y secuencia."""
+    """Una fila por activo: tendencia, quiebre, último máximo y mínimo, y secuencia."""
     def giro(g):
         return f"{g['etiqueta']} {g['precio']:.2f} ({g['fecha']:%d-%m-%Y})" if g else None
     filas = {}
@@ -224,21 +224,79 @@ def _tabla_estructura(estructura: dict) -> pd.DataFrame:
             "Precio actual": r["precio"],
             "Último máximo": giro(r["ultimo_maximo"]),
             "Último mínimo": giro(r["ultimo_minimo"]),
+            "Quiebre": r["quiebre"],
             "Secuencia": " → ".join(r["secuencia"]) or None,
         }
-    columnas = ["Tendencia", "Precio actual", "Último máximo", "Último mínimo", "Secuencia"]
+    columnas = ["Tendencia", "Precio actual", "Último máximo", "Último mínimo", "Quiebre", "Secuencia"]
     return pd.DataFrame.from_dict(filas, orient="index").reindex(columns=columnas)
 
 
+def _tabla_medias(estructura: dict) -> pd.DataFrame:
+    """Una fila por activo: precio, cada media y si el precio está por encima o
+    por debajo, alineación y último cruce de la de 50 con la de 200."""
+    filas = {}
+    for ticker, r in estructura.items():
+        if r is None:
+            continue
+        m = r["medias"]
+        fila = {"Precio": m["precio"]}
+        for dias, valor in m["medias"].items():
+            if pd.isna(valor):
+                fila[f"MM{dias}"] = "—"
+            else:
+                fila[f"MM{dias}"] = f"{valor:.2f} {'▲' if m['precio'] > valor else '▼'}"
+        fila["Alineación"] = m["alineacion"]
+        if m["cruce"]:
+            fila["Cruce 50/200"] = f"{m['cruce']['tipo']} ({m['cruce']['fecha']:%d-%m-%Y})"
+        elif m["cruce_desde"] is not None:
+            fila["Cruce 50/200"] = f"Sin cruce desde {m['cruce_desde']:%d-%m-%Y}"
+        else:
+            fila["Cruce 50/200"] = "—"
+        filas[ticker] = fila
+    return pd.DataFrame.from_dict(filas, orient="index")
+
+
+def _tabla_dmi(estructura: dict) -> pd.DataFrame:
+    """Una fila por activo: ADX y su lectura, +DI, −DI y dirección."""
+    filas = {}
+    for ticker, r in estructura.items():
+        if r is None or r["dmi"].get("adx") is None:
+            continue
+        d = r["dmi"]
+        filas[ticker] = {
+            "ADX": f"{d['adx']:.1f} {'▲' if d['adx_subiendo'] else '▼'}",
+            "Potencia": d["lectura"],
+            "+DI": f"{d['di_mas']:.1f}",
+            "−DI": f"{d['di_menos']:.1f}",
+            "Dirección": d["direccion"] + (f" desde {d['desde']:%d-%m-%Y}" if d["desde"] is not None else ""),
+        }
+    return pd.DataFrame.from_dict(filas, orient="index")
+
+
 def mostrar_estructura(estructura: dict, meses: int):
-    """Tendencia de cada activo según su estructura de máximos y mínimos."""
-    print(f"\nEstructura de mercado (diaria, últimos {meses} meses)")
+    """Análisis técnico en el orden de lectura: estructura (dirección),
+    medias móviles (confirmación), DI (quién domina) y ADX (potencia)."""
+    print(f"\n1) Estructura de mercado (diaria, últimos {meses} meses)")
     print(_tabla_estructura(estructura).to_string(
         na_rep="—", formatters={"Precio actual": lambda v: "—" if pd.isna(v) else f"{v:.2f}"}))
     print("\n  " + _NOTA_ESTRUCTURA.format(meses=meses))
+    print("  Quiebre: el precio actual ya rompió el último máximo o mínimo confirmado.")
     for ticker, r in estructura.items():
         if r is None:
             print(f"  Aviso: Yahoo no devolvió los precios diarios de {ticker}. Probá de nuevo en unos minutos.")
+    medias = _tabla_medias(estructura)
+    if not medias.empty:
+        print("\n2) Medias móviles simples")
+        print(medias.to_string(formatters={"Precio": "{:.2f}".format}))
+        print("\n  ▲ precio por encima de la media, ▼ por debajo. Alineación alcista: MM9 > MM21 > MM50 > MM200;"
+              " bajista, al revés. Cruce 50/200: dorado (la de 50 pasa por encima) o de la muerte (por debajo).")
+    dmi = _tabla_dmi(estructura)
+    if not dmi.empty:
+        print("\n3) DMI y 4) ADX (14 días, Wilder)")
+        print(dmi.to_string())
+        print("\n  Dirección: alcista si +DI > −DI, bajista si −DI > +DI, desde el último cruce. Potencia según el"
+              " ADX: menos de 20 sin tendencia, 20 a 25 débil, 25 a 40 fuerte, más de 40 muy fuerte."
+              " ▲/▼: el ADX subió o bajó en la última semana.")
 
 
 # ---------------------------------------------------------------------------

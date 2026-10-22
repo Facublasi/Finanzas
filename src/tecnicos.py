@@ -83,3 +83,138 @@ def estructura_mercado(precios: pd.DataFrame) -> dict:
         "secuencia": list(con_etiqueta["etiqueta"].tail(6)),
         "giros": giros,
     }
+
+
+# ---------------------------------------------------------------------------
+# Quiebre de estructura
+# ---------------------------------------------------------------------------
+
+def quiebre(estructura: dict, precio: float):
+    """Avisa si el precio actual ya rompió el último máximo o mínimo
+    confirmado, antes de que se confirme un giro nuevo."""
+    maximo, minimo = estructura["ultimo_maximo"], estructura["ultimo_minimo"]
+    if minimo and precio < minimo["precio"]:
+        return f"Bajista: perforó el mínimo de {minimo['precio']:.2f}"
+    if maximo and precio > maximo["precio"]:
+        return f"Alcista: superó el máximo de {maximo['precio']:.2f}"
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Medias móviles
+# ---------------------------------------------------------------------------
+
+PERIODOS_MEDIAS = (9, 21, 50, 200)
+
+
+def medias_moviles(cierres: pd.Series, periodos=PERIODOS_MEDIAS) -> dict:
+    """Medias móviles simples de hoy, posición del precio respecto de cada una,
+    si están alineadas y el último cruce entre la de 50 y la de 200."""
+    medias = {p: cierres.rolling(p).mean() for p in periodos}
+    precio = cierres.iloc[-1]
+    hoy = {p: medias[p].iloc[-1] for p in periodos}
+    if any(pd.isna(v) for v in hoy.values()):
+        return {"precio": precio, "medias": hoy, "alineacion": "Sin datos suficientes", "cruce": None,
+                "cruce_desde": None}
+
+    # Alineadas: de la más corta a la más larga, cada una por encima (alcista)
+    # o por debajo (bajista) de la siguiente.
+    valores = [hoy[p] for p in sorted(periodos)]
+    if all(a > b for a, b in zip(valores, valores[1:])):
+        alineacion = "Alcista"
+    elif all(a < b for a, b in zip(valores, valores[1:])):
+        alineacion = "Bajista"
+    else:
+        alineacion = "Mezclada"
+
+    cruce, cruce_desde = None, None
+    if 50 in medias and 200 in medias:
+        diferencia = (medias[50] - medias[200]).dropna()
+        # Desde cuándo se pueden buscar cruces: el primer día con las dos medias.
+        cruce_desde = diferencia.index[0]
+        signo = diferencia > 0
+        cambios = signo[signo != signo.shift()].index[1:]
+        if len(cambios):
+            fecha = cambios[-1]
+            cruce = {"fecha": fecha, "tipo": "Dorado" if signo[fecha] else "De la muerte"}
+    return {"precio": precio, "medias": hoy, "alineacion": alineacion, "cruce": cruce,
+            "cruce_desde": cruce_desde}
+
+
+# ---------------------------------------------------------------------------
+# DMI y ADX (Wilder)
+# ---------------------------------------------------------------------------
+
+DIAS_DMI = 14
+# Días hábiles hacia atrás para ver si el ADX sube o baja.
+DIAS_PENDIENTE_ADX = 5
+
+
+def _wilder(serie: pd.Series, dias: int) -> pd.Series:
+    """Suavizado de Wilder (el ta.rma de TradingView): arranca con el promedio
+    simple de los primeros `dias` valores y después cada valor nuevo pesa 1/dias."""
+    serie = serie.dropna()
+    resultado = pd.Series(float("nan"), index=serie.index)
+    if len(serie) < dias:
+        return resultado
+    anterior = serie.iloc[:dias].mean()
+    resultado.iloc[dias - 1] = anterior
+    for i in range(dias, len(serie)):
+        anterior = (anterior * (dias - 1) + serie.iloc[i]) / dias
+        resultado.iloc[i] = anterior
+    return resultado
+
+
+def dmi(maximos: pd.Series, minimos: pd.Series, cierres: pd.Series, dias: int = DIAS_DMI):
+    """+DI, −DI y ADX diarios, con el método de Wilder (igual que TradingView)."""
+    suba = maximos.diff()
+    baja = -minimos.diff()
+    dm_mas = suba.where((suba > baja) & (suba > 0), 0.0)
+    dm_menos = baja.where((baja > suba) & (baja > 0), 0.0)
+    dm_mas[suba.isna()] = float("nan")
+    dm_menos[suba.isna()] = float("nan")
+    cierre_anterior = cierres.shift()
+    rango = pd.concat([maximos - minimos, (maximos - cierre_anterior).abs(),
+                       (minimos - cierre_anterior).abs()], axis=1).max(axis=1)
+    rango[cierre_anterior.isna()] = float("nan")
+
+    rango_suavizado = _wilder(rango, dias)
+    di_mas = 100 * _wilder(dm_mas, dias) / rango_suavizado
+    di_menos = 100 * _wilder(dm_menos, dias) / rango_suavizado
+    suma = (di_mas + di_menos).replace(0, 1)
+    adx = _wilder(100 * (di_mas - di_menos).abs() / suma, dias)
+    return di_mas, di_menos, adx
+
+
+def lectura_adx(adx: float) -> str:
+    """Potencia de la tendencia según el valor del ADX."""
+    if adx < 20:
+        return "Sin tendencia"
+    if adx < 25:
+        return "Débil"
+    if adx < 40:
+        return "Fuerte"
+    return "Muy fuerte"
+
+
+def resumen_dmi(maximos: pd.Series, minimos: pd.Series, cierres: pd.Series) -> dict:
+    """ADX, +DI y −DI de hoy; dirección según qué DI domina, fecha del último
+    cruce de los DI y si el ADX sube o baja respecto de hace una semana."""
+    di_mas, di_menos, adx = dmi(maximos, minimos, cierres)
+    if adx.dropna().empty:
+        return {"adx": None}
+    # Solo los días con los dos DI calculados: comparar con un valor vacío
+    # daría False y podría inventar un cruce.
+    validos = di_mas.notna() & di_menos.notna()
+    domina = (di_mas > di_menos)[validos]
+    cambios = domina[domina != domina.shift()].index[1:]
+    pendiente = adx.iloc[-1] - adx.iloc[-1 - DIAS_PENDIENTE_ADX]
+    return {
+        "adx": adx.iloc[-1],
+        "di_mas": di_mas.iloc[-1],
+        "di_menos": di_menos.iloc[-1],
+        "lectura": lectura_adx(adx.iloc[-1]),
+        "direccion": "Alcista" if domina.iloc[-1] else "Bajista",
+        "desde": cambios[-1] if len(cambios) else None,
+        "adx_subiendo": pendiente > 0,
+    }

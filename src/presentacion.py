@@ -145,9 +145,11 @@ def _tabla_consenso(analistas: dict) -> pd.DataFrame:
         for meses, valores in historia.items():
             if meses == "anualizada":
                 continue
-            fila[(f"Hace {meses} meses", "Prometía")] = valores["prometida"]
-            fila[(f"Hace {meses} meses", "Subió")] = valores["real"]
-        fila[(f"{analistas['anios'] * 12} meses", "Anualizada")] = historia["anualizada"]
+            # Sin dato queda vacío (NaN), y la tabla lo muestra como "—".
+            fila[(f"Hace {meses} meses", "Prometía")] = valores["prometida"] if valores["prometida"] is not None else float("nan")
+            fila[(f"Hace {meses} meses", "Subió")] = valores["real"] if valores["real"] is not None else float("nan")
+        fila[(f"{analistas['anios'] * 12} meses", "Anualizada")] = (
+            historia["anualizada"] if historia["anualizada"] is not None else float("nan"))
         filas[ticker] = fila
     if not filas:
         return pd.DataFrame()
@@ -192,6 +194,10 @@ def mostrar_analistas(analistas: dict):
         print("\nConsenso contra realidad, a 12 meses")
         print(consenso.to_string(na_rep="—", float_format=lambda v: _pct(v)))
         print("\n  " + _NOTA_CONSENSO)
+        for ticker, fila in consenso.iterrows():
+            if fila.isna().any():
+                print(f"  Aviso: {ticker} no tiene objetivos de analistas en Yahoo en el año previo a alguna de esas"
+                      " fechas; esas celdas quedan vacías.")
     bancos = analistas["bancos"]
     if not bancos.empty:
         print("\nPrecisión por banco (al menos 3 objetivos evaluados)")

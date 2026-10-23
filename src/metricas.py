@@ -233,11 +233,12 @@ def consenso_contra_realidad(objetivos: pd.DataFrame, precios: pd.Series, hoy, a
         valor = consenso(objetivos, fecha)
         desde = precios[precios.index <= fecha]
         hasta = precios[precios.index <= fin]
-        if valor is None or desde.empty or hasta.empty:
+        if desde.empty or hasta.empty:
             resultado[12 * anio] = {"prometida": None, "real": None}
             continue
+        # La suba real solo depende de los precios: se calcula aunque falte el consenso.
         resultado[12 * anio] = {
-            "prometida": valor / desde.iloc[-1] - 1,
+            "prometida": valor / desde.iloc[-1] - 1 if valor is not None else None,
             "real": hasta.iloc[-1] / desde.iloc[-1] - 1,
         }
     reales = [r["real"] for r in resultado.values()]

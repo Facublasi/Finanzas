@@ -128,7 +128,7 @@ Cada vez que se corre el programa, los dos archivos se reemplazan. Las diapositi
 3. **Métricas por activo**: la misma tabla comparativa de la pantalla, con la fila de la cartera.
 4. **Evolución de precios**: gráfico de cada activo con los precios llevados a 100 al inicio del período.
 5. **Riesgo, retorno y Sharpe**: gráfico de volatilidad contra retorno y barras con el Sharpe de cada activo y de la cartera.
-6. **Correlaciones**: mapa de calor con la mitad de abajo de la matriz (es simétrica y la diagonal siempre vale 1). Usa su propia escala de colores: rojo para −1, amarillo para 0 y verde para 1. La matriz de covarianzas se muestra solo en pantalla.
+6. **Correlaciones**: mapa de calor con la mitad de abajo de la matriz (es simétrica y la diagonal siempre vale 1). Usa su propia escala de colores: rojo para −1, amarillo para 0 y verde para 1. Con más de 6 activos el gráfico se agranda, los nombres de abajo se inclinan y los valores se muestran con 2 decimales para que entren en las celdas (en pantalla siguen con 4). La matriz de covarianzas se muestra solo en pantalla.
 7. **Analistas** (solo si se pidió): la tabla de proyecciones por activo, el consenso contra la realidad a 12 meses y los 4 bancos con más objetivos evaluados.
 8. **Metodología**: cómo se calcula cada métrica, y los datos de contacto.
 

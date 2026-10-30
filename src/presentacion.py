@@ -442,14 +442,19 @@ def grafico_correlaciones(correlaciones: pd.DataFrame) -> str:
     for i in range(n):
         for j in range(i + 1, n):
             valores[i, j] = float("nan")  # Mitad repetida: queda en blanco.
-    fig, ax = plt.subplots(figsize=(6.4, 5.4))
+    # Con muchos activos las celdas se achican: el gráfico crece con la cantidad
+    # y los valores se muestran con 2 decimales para que entren en cada celda.
+    lado = max(5.4, 0.5 * n)
+    fig, ax = plt.subplots(figsize=(lado * 1.2, lado))
+    decimales = 4 if n <= 5 else 2
     mapa = matplotlib.colormaps["RdYlGn"].copy()
     mapa.set_bad(alpha=0)
     imagen = ax.imshow(valores, cmap=mapa, vmin=-1, vmax=1)
     barra = fig.colorbar(imagen, ax=ax, fraction=0.046, pad=0.04, ticks=[-1, -0.5, 0, 0.5, 1])
     barra.outline.set_visible(False)
     ax.grid(False)
-    ax.set_xticks(range(n), tabla.columns, fontweight="bold", color=NAVY)
+    ax.set_xticks(range(n), tabla.columns, fontweight="bold", color=NAVY,
+                  rotation=0 if n <= 5 else 45, ha="center" if n <= 5 else "right", rotation_mode="anchor")
     ax.set_yticks(range(n), tabla.index, fontweight="bold", color=NAVY)
     ax.tick_params(length=0)
     for spine in ax.spines.values():
@@ -457,7 +462,7 @@ def grafico_correlaciones(correlaciones: pd.DataFrame) -> str:
     for i in range(n):
         for j in range(i + 1):
             valor = valores[i, j]
-            ax.text(j, i, f"{valor:.4f}", ha="center", va="center", fontsize=11 if n <= 4 else 9,
+            ax.text(j, i, f"{valor:.{decimales}f}", ha="center", va="center", fontsize=11 if n <= 4 else 9,
                     color="white" if abs(valor) > 0.75 else TINTA)
     return _a_png(fig)
 
